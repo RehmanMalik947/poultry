@@ -1,0 +1,32 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon app.js",
+    "seed:superadmin": "node scripts/seedSuperAdmin.js",
+    "seed:all": "node scripts/seedAllTables.js",
+    "fix:superadmin-password": "node scripts/fixSuperAdminPassword.js",
+    "migrate": "node migrations/20250305000000-add-indexes-to-all-models.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "bwip-js": "^4.10.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-validator": "^7.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "mysql2": "^3.17.2",
+    "nodemailer": "^6.10.1",
+    "nodemon": "^3.1.11",
+    "sequelize": "^6.37.7",
+    "stripe": "^22.0.1"
+  }
+}

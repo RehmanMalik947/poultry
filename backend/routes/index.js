@@ -1,0 +1,66 @@
+const express = require("express");
+const router = express.Router();
+
+// Import Routes
+const authRoutes = require("./authRoutes");
+const organizationProfileRoutes = require("./organizationProfileRoutes");
+const branchRoutes = require("./branchRoutes");
+const customerRoutes = require("./customerRoutes");
+const supplierRoutes = require("./supplierRoutes");
+const staffRoutes = require("./staffRoutes");
+const productRoutes = require("./productRoutes");
+const roleRoutes = require("./roleRoutes");
+const categoryRoutes = require("./categoryRoutes");
+const unitRoutes = require("./unitRoutes");
+const brandRoutes = require("./brandRoutes");
+const variationRoutes = require("./variationRoutes");
+const serviceRoutes = require("./serviceRoutes");
+const saleRoutes = require("./saleRoutes");
+const appointmentRoutes = require("./appointmentRoutes");
+const expenseCategoryRoutes = require("./expenseCategoryRoutes");
+const expenseRoutes = require("./expenseRoutes");
+const userSalaryRoutes = require("./userSalaryRoutes");
+const attendanceRoutes = require("./attendanceRoutes");
+const payrollRoutes = require("./payrollRoutes");
+const financeRoutes = require("./financeRoutes");
+const purchaseRoutes = require("./purchaseRoutes");
+const bankRoutes = require("./bankRoutes");
+const superAdminRoutes = require("./superAdminRoutes");
+const stockRoutes = require("./stockRoutes");
+const packageRoutes = require("./packageRoutes");
+const publicRoutes = require("./publicRoutes");
+const registerRoutes = require("./registerRoutes");
+const reportRoutes = require("./reportRoutes");
+
+// Register Routes
+router.use("/auth", authRoutes);
+router.use("/organization", organizationProfileRoutes);
+router.use("/branches", branchRoutes);
+router.use("/customers", customerRoutes);
+router.use("/suppliers", supplierRoutes);
+router.use("/staff", staffRoutes);
+router.use("/products", productRoutes);
+router.use("/roles", roleRoutes);
+router.use("/categories", categoryRoutes);
+router.use("/units", unitRoutes);
+router.use("/brands", brandRoutes);
+router.use("/variations", variationRoutes);
+router.use("/services", serviceRoutes);
+router.use("/packages", packageRoutes);
+router.use("/pos", saleRoutes);
+router.use("/appointments", appointmentRoutes);
+router.use("/expense-categories", expenseCategoryRoutes);
+router.use("/expenses", expenseRoutes);
+router.use("/user-salaries", userSalaryRoutes);
+router.use("/attendances", attendanceRoutes);
+router.use("/payrolls", payrollRoutes);
+router.use("/finance", financeRoutes);
+router.use("/supplier-purchases", purchaseRoutes);
+router.use("/banks", bankRoutes);
+router.use("/super-admin", superAdminRoutes);
+router.use("/stocks", stockRoutes);
+router.use("/public", publicRoutes);
+router.use("/pos/register", registerRoutes);
+router.use("/reports", reportRoutes);
+
+module.exports = router;
