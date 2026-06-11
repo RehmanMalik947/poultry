@@ -94,7 +94,7 @@ export function PayToSupplier() {
 
       try {
         const [suppliersRes, banksRes] = await Promise.all([
-          ApiService.suppliers.getAll(),
+          ApiService.suppliers.getAll({ limit: 1000 }),
           ApiService.banks?.getAll ? ApiService.banks.getAll() : ApiService.accounts?.getAll?.(),
         ]);
 
@@ -179,9 +179,8 @@ export function PayToSupplier() {
     }
 
     const payload = {
-      date,
-      supplierId: Number(supplierId),
-      referenceNumber: referenceNumber || null,
+      date: format(date, "yyyy-MM-dd"),
+      referenceNo: referenceNumber || null,
       cashPayment: cashAmount,
       bankPayment: bankAmount,
       totalPaid,
@@ -190,18 +189,39 @@ export function PayToSupplier() {
     };
 
     setIsSaving(true);
+    let saved = false;
 
     try {
       console.log("Pay to supplier payload:", payload);
 
-      // Backend API will be connected later.
-      // await ApiService.supplierPayments.create(payload);
-
-      toast.success("Supplier payment UI is ready. Backend save API will be connected next.");
+      await ApiService.suppliers.addPayment(Number(supplierId), payload);
+      saved = true;
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Failed to save supplier payment");
     } finally {
       setIsSaving(false);
+    }
+
+    if (saved) {
+      toast.success("Payment recorded successfully!");
+
+      // Clear form
+      setDate(new Date());
+      setReferenceNumber("");
+      setSupplierId("");
+      setSupplierSearch("");
+      setCashPayment("");
+      setBankPayment("");
+      setBankId("");
+      setNote("");
+
+      // Re-fetch suppliers to update balances
+      try {
+        const suppliersRes = await ApiService.suppliers.getAll({ limit: 1000 });
+        setSuppliers(Array.isArray(suppliersRes) ? suppliersRes : suppliersRes?.data || []);
+      } catch (_) {
+        // silently ignore
+      }
     }
   };
 
@@ -323,9 +343,9 @@ export function PayToSupplier() {
             </div>
 
             <div className="space-y-1">
-              <Label>Reference Number</Label>
+              <Label>Receipt No</Label>
               <Input
-                placeholder="Reference Number"
+                placeholder="Receipt No (Auto if left empty)"
                 value={referenceNumber}
                 onChange={(event) => setReferenceNumber(event.target.value)}
               />

@@ -935,31 +935,31 @@ async function addSupplierPayment(req, res) {
       });
     }
 
-    const {
-      amount,
-      paymentMethod,
-      accountId,
+    let {
+      cashPayment,
+      bankPayment,
+      totalPaid,
+      bankId,
       referenceNo,
       note,
-      paymentDate,
-      externalAccountNo,
-      chequeNo,
+      date,
     } = req.body;
 
-    const paymentAmount = parseFloat(amount);
+    const cPayment = parseFloat(cashPayment) || 0;
+    const bPayment = parseFloat(bankPayment) || 0;
+    let paymentAmount = cPayment + bPayment;
 
-    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+    if (paymentAmount <= 0 && parseFloat(totalPaid) > 0) {
+      paymentAmount = parseFloat(totalPaid);
+    }
+
+    if (paymentAmount <= 0) {
       await transaction.rollback();
-
-      return res.status(400).json({
-        success: false,
-        message: "Valid amount is required",
-      });
+      return res.status(400).json({ success: false, message: "Valid amount is required" });
     }
 
     let paymentRefNo = referenceNo;
-
-    if (!paymentRefNo) {
+    if (!paymentRefNo || (typeof paymentRefNo === 'string' && paymentRefNo.trim() === "")) {
       paymentRefNo = await generatePaymentReference(
         organizationId,
         "payment",
@@ -967,35 +967,24 @@ async function addSupplierPayment(req, res) {
       );
     }
 
-    const effectiveRefNo = externalAccountNo || chequeNo || paymentRefNo;
+    let paymentMethod = "cash";
+    if (bPayment > 0 && cPayment === 0) paymentMethod = "bank_transfer";
+    else if (cPayment > 0 && bPayment > 0) paymentMethod = "multiple";
 
-    if (accountId && accountId !== "none" && accountId !== "") {
-      const bankId = parseInt(accountId, 10);
-
+    if (bPayment > 0 && bankId) {
       const bank = await Bank.findOne({
-        where: {
-          id: bankId,
-          organizationId,
-        },
+        where: { id: bankId, organizationId },
         transaction,
       });
 
       if (!bank) {
         await transaction.rollback();
-
-        return res.status(400).json({
-          success: false,
-          message: "Invalid bank account",
-        });
+        return res.status(400).json({ success: false, message: "Invalid bank account" });
       }
 
-      if (Number(bank.balance) < paymentAmount) {
+      if (Number(bank.balance) < bPayment) {
         await transaction.rollback();
-
-        return res.status(400).json({
-          success: false,
-          message: "Insufficient bank balance",
-        });
+        return res.status(400).json({ success: false, message: "Insufficient bank balance" });
       }
 
       await BankTransaction.create(
@@ -1003,21 +992,16 @@ async function addSupplierPayment(req, res) {
           organizationId,
           bankId: bank.id,
           type: "debit",
-          amount: paymentAmount,
+          amount: bPayment,
           transactionType: "supplier_payment",
           referenceId: s.id,
-          description: `Supplier Payment: ${s.name} (${paymentRefNo})${
-            effectiveRefNo && effectiveRefNo !== paymentRefNo
-              ? " - " + effectiveRefNo
-              : ""
-          }`,
-          transactionDate: paymentDate || new Date(),
+          description: `Supplier Payment: ${s.name} (${paymentRefNo})`,
+          transactionDate: date || new Date(),
         },
         { transaction }
       );
 
-      bank.balance = Number(bank.balance) - Number(paymentAmount);
-
+      bank.balance = Number(bank.balance) - Number(bPayment);
       await bank.save({ transaction });
     }
 
@@ -1082,12 +1066,12 @@ async function addSupplierPayment(req, res) {
             credit: applyAmount,
             balance: prevBal - applyAmount,
             paymentMethod: paymentMethod || "cash",
-            bankId: accountId || null,
+            bankId: bankId || null,
             referenceNo: paymentRefNo,
             note:
               note ||
               `Payment ${paymentRefNo} for purchase ${p.referenceNo || p.id}`,
-            date: paymentDate || new Date(),
+            date: date || new Date(),
           },
           { transaction }
         );
@@ -1127,10 +1111,10 @@ async function addSupplierPayment(req, res) {
           credit: remainingPayment,
           balance: prevBal - remainingPayment,
           paymentMethod: paymentMethod || "cash",
-          bankId: accountId || null,
+          bankId: bankId || null,
           referenceNo: advRefNo,
           note: note || `Advance payment ${advRefNo} to supplier`,
-          date: paymentDate || new Date(),
+          date: date || new Date(),
         },
         { transaction }
       );

@@ -390,8 +390,8 @@ const totalAmountVal = w * r;
   shippingDetails,
   shippingCharges: String(formData.shippingCharges ?? 0),
 
-  paymentAmount: String(totalAmountVal),
-  paymentMethod,
+  paymentAmount: "0",
+  paymentMethod: "credit",
   paymentAccount,
   paymentNote,
   paymentDate: format(paymentDate, "yyyy-MM-dd"),
