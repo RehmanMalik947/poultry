@@ -155,8 +155,26 @@ exports.submitSale = async (req, res) => {
       payTermNumber,
       payTermType,
       saleDate,
+      weight,
+rate,
+driverName,
+lorryNo,
     } = req.body;
+if (!saleDate) {
+  throw new Error("Sale date is required");
+}
 
+if (!customerId) {
+  throw new Error("Customer is required");
+}
+
+if (!weight || parseFloat(weight) <= 0) {
+  throw new Error("Weight is required");
+}
+
+if (!rate || parseFloat(rate) <= 0) {
+  throw new Error("Rate is required");
+}
     let finalDueDate = dueDate;
     if (!finalDueDate && payTermNumber > 0) {
       const d = new Date(saleDate || new Date());
@@ -195,9 +213,9 @@ exports.submitSale = async (req, res) => {
         discountAmount: discountAmount || 0,
         discountRate: discountRate || 0,
         amountPaid: amountPaid || 0,
-        status: status || 'paid',
+        status: status || 'unpaid',
         paymentMethod: normalizedPaymentMethod,
-        paymentStatus: paymentStatus || 'paid',
+        paymentStatus: paymentStatus || 'due',
         totalItems: totalItems || null,
         referenceNo: referenceNo || null,
         shippingDetails: shippingDetails || null,
@@ -211,6 +229,10 @@ exports.submitSale = async (req, res) => {
         payTermType: payTermType || 'days',
         dueDate: finalDueDate || null,
         createdAt: saleDate || undefined,
+        weight: parseFloat(weight) || 0,
+rate: parseFloat(rate) || 0,
+driverName: driverName || deliveryPerson || null,
+lorryNo: lorryNo || null,
       }, { transaction: t });
     } else {
       // Generate invoice number for new sale
@@ -228,9 +250,9 @@ exports.submitSale = async (req, res) => {
         discountAmount: discountAmount || 0,
         discountRate: discountRate || 0,
         amountPaid: amountPaid || 0,
-        status: status || 'paid',
+        status: status || 'unpaid',
         paymentMethod: normalizedPaymentMethod,
-        paymentStatus: paymentStatus || 'paid',
+        paymentStatus: paymentStatus || 'due',
         totalItems: totalItems || null,
         referenceNo: referenceNo || null,
         shippingDetails: shippingDetails || null,
@@ -244,93 +266,132 @@ exports.submitSale = async (req, res) => {
         payTermType: payTermType || 'days',
         dueDate: finalDueDate || null,
         createdAt: saleDate || new Date(),
+        weight: parseFloat(weight) || 0,
+rate: parseFloat(rate) || 0,
+driverName: driverName || deliveryPerson || null,
+lorryNo: lorryNo || null,
       }, { transaction: t });
     }
 
-    let subtotal = 0;
-    if (items && items.length > 0) {
-      const saleItemsData = items.map(i => {
-        subtotal += parseFloat(i.price) * i.quantity;
-        return {
-          saleId: sale.id,
-          itemId: i.itemId,
-          itemType: i.itemType,
-          itemName: i.itemName,
-          price: i.price,
-          quantity: i.quantity,
-          variationId: i.variationId || null,
-        };
-      });
-      await SaleItem.bulkCreate(saleItemsData, { transaction: t });
+const DEFAULT_PRODUCT_ID = 1;
+const finalWeight = parseFloat(weight) || 0;
+const finalRate = parseFloat(rate) || 0;
 
-      // Commission Logic (StaffLog)
-      const staffLogsData = [];
-      for (const item of items) {
-        const itemStaffId = item.staffId || staffId;
-        if (itemStaffId) {
-          let commType = 'percentage';
-          let commValue = 0;
-          let amountEarned = 0;
-          let rateLabel = '0%';
+let finalItems = Array.isArray(items) ? items : [];
 
-          if (item.itemType === 'service' || item.itemType === 'package') {
-            if (item.itemType === 'service' && StaffService) {
-              const specificRate = await StaffService.findOne({
-                where: { staffId: itemStaffId, serviceId: item.itemId },
-                transaction: t
-              });
-              
-              if (specificRate && specificRate.commissionValue != null) {
-                commType = specificRate.commissionType || 'percentage';
-                commValue = parseFloat(specificRate.commissionValue);
-              } else {
-                // Fallback to global staff commission
-                const staffMember = await Staff.findByPk(itemStaffId, { transaction: t });
-                if (staffMember) {
-                  commType = staffMember.commissionType || 'percentage';
-                  commValue = parseFloat(staffMember.commissionValue) || 0;
-                }
-              }
-            } else {
-              // Fallback to Staff global directly (e.g. for package)
-              const staffMember = await Staff.findByPk(itemStaffId, { transaction: t });
-              if (staffMember) {
-                commType = staffMember.commissionType || 'percentage';
-                commValue = parseFloat(staffMember.commissionValue) || 0;
-              }
-            }
+if (finalItems.length === 0 && finalWeight > 0 && finalRate > 0) {
+  const defaultProduct = await Product.findOne({
+    where: {
+      id: DEFAULT_PRODUCT_ID,
+      organizationId,
+    },
+    transaction: t,
+  });
 
-            if (commValue > 0) {
-              const itemTotal = parseFloat(item.price) * parseInt(item.quantity);
-              amountEarned = commType === 'percentage' 
-                ? (itemTotal * (commValue / 100)) 
-                : (commValue * parseInt(item.quantity));
-            }
-            rateLabel = commType === 'percentage' ? `${commValue}%` : `${commValue} Fixed`;
-          } else {
-            // Product or other item types: 0% commission
-            rateLabel = '0% (No comm.)';
-            amountEarned = 0;
-          }
+  if (!defaultProduct) {
+    throw new Error("Default poultry product not found. Please create product ID 1 first.");
+  }
 
-          staffLogsData.push({
-            organizationId,
-            branchId,
-            staffId: itemStaffId,
-            saleId: sale.id,
-            actionType: 'Commission',
-            itemName: item.itemName,
-            price: item.price,
-            commissionRate: rateLabel,
-            amountEarned: amountEarned
+  finalItems = [
+    {
+      itemId: defaultProduct.id,
+      itemType: "product",
+      itemName: defaultProduct.name || "Poultry",
+      price: finalRate,
+      quantity: finalWeight,
+      variationId: null,
+    },
+  ];
+}
+
+let subtotal = 0;
+
+if (finalItems && finalItems.length > 0) {
+  const saleItemsData = finalItems.map((i) => {
+    subtotal += parseFloat(i.price) * parseFloat(i.quantity);
+
+    return {
+      saleId: sale.id,
+      itemId: i.itemId,
+      itemType: i.itemType,
+      itemName: i.itemName,
+      price: i.price,
+      quantity: i.quantity,
+      variationId: i.variationId || null,
+    };
+  });
+
+  await SaleItem.bulkCreate(saleItemsData, { transaction: t });
+
+  // Commission Logic (StaffLog)
+  const staffLogsData = [];
+
+  for (const item of finalItems) {
+    const itemStaffId = item.staffId || staffId;
+
+    if (itemStaffId) {
+      let commType = "percentage";
+      let commValue = 0;
+      let amountEarned = 0;
+      let rateLabel = "0%";
+
+      if (item.itemType === "service" || item.itemType === "package") {
+        if (item.itemType === "service" && StaffService) {
+          const specificRate = await StaffService.findOne({
+            where: { staffId: itemStaffId, serviceId: item.itemId },
+            transaction: t,
           });
+
+          if (specificRate && specificRate.commissionValue != null) {
+            commType = specificRate.commissionType || "percentage";
+            commValue = parseFloat(specificRate.commissionValue);
+          } else {
+            const staffMember = await Staff.findByPk(itemStaffId, { transaction: t });
+            if (staffMember) {
+              commType = staffMember.commissionType || "percentage";
+              commValue = parseFloat(staffMember.commissionValue) || 0;
+            }
+          }
+        } else {
+          const staffMember = await Staff.findByPk(itemStaffId, { transaction: t });
+          if (staffMember) {
+            commType = staffMember.commissionType || "percentage";
+            commValue = parseFloat(staffMember.commissionValue) || 0;
+          }
         }
+
+        if (commValue > 0) {
+          const itemTotal = parseFloat(item.price) * parseFloat(item.quantity);
+          amountEarned =
+            commType === "percentage"
+              ? itemTotal * (commValue / 100)
+              : commValue * parseFloat(item.quantity);
+        }
+
+        rateLabel = commType === "percentage" ? `${commValue}%` : `${commValue} Fixed`;
+      } else {
+        rateLabel = "0% (No comm.)";
+        amountEarned = 0;
       }
 
-      if (staffLogsData.length > 0 && StaffLog) {
-        await StaffLog.bulkCreate(staffLogsData, { transaction: t });
-      }
+      staffLogsData.push({
+        organizationId,
+        branchId,
+        staffId: itemStaffId,
+        saleId: sale.id,
+        actionType: "Commission",
+        itemName: item.itemName,
+        price: item.price,
+        commissionRate: rateLabel,
+        amountEarned,
+      });
     }
+  }
+
+  if (staffLogsData.length > 0 && StaffLog) {
+    await StaffLog.bulkCreate(staffLogsData, { transaction: t });
+  }
+}
 
     const discount = parseFloat(sale.discountAmount) || 0;
     const taxP = parseFloat(sale.taxPercent) || 0;

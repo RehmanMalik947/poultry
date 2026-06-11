@@ -117,7 +117,11 @@ const MENU_PATH_PERMISSIONS: Record<string, string[] | null> = {
   '/expense/add': ['expense_create'],
   '/expense/categories': ['expense_category_view'],
 
-  '/accounts': ['finance_view_all', 'finance_view_own'],
+'/accounts': ['finance_view_all', 'finance_view_own'],
+'/accounts/receive-from-customers': ['finance_view_all', 'finance_view_own'],
+'/accounts/pay-to-supplier': ['finance_view_all', 'finance_view_own'],
+
+
 };
 
 
@@ -193,13 +197,15 @@ const menuItems: MenuItem[] = [
 
   },
   {
-    path: '/accounts',
-    label: 'Bank Accounts',
-    icon: Banknote,  // already imported hai
-    children: [
-      { path: '/accounts', label: 'List Accounts', icon: Circle },
-    ],
-  },
+  path: '/accounts',
+  label: 'Bank Accounts',
+  icon: Banknote,
+  children: [
+    { path: '/accounts', label: 'List Accounts', icon: Circle },
+    { path: '/accounts/receive-from-customers', label: 'Receive From Customers', icon: Circle },
+    { path: '/accounts/pay-to-supplier', label: 'Pay To Supplier', icon: Circle },
+  ],
+},
   {
     path: '/purchases',
     label: 'Purchases',

@@ -116,9 +116,9 @@ export function AddPurchase() {
 
   // NEW FIELDS
   const [weight, setWeight] = useState("");
-  const [price, setPrice] = useState("");
-  const [transportName, setTransportName] = useState("");
-  const [loryNo, setLoryNo] = useState("");
+const [rate, setRate] = useState("");
+const [transportName, setTransportName] = useState("");
+const [lorryNo, setLorryNo] = useState("");
 
   const [units, setUnits] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
@@ -312,24 +312,26 @@ export function AddPurchase() {
 
 
   // Dynamic calculations for summary (assuming 0 Net Total from products for now)
-  const calculateTotal = () => {
-    let base = purchaseItems.reduce((sum, item) => sum + (item.qty * item.unitCost), 0);
+ const calculateTotal = () => {
+  const base = (Number(weight) || 0) * (Number(rate) || 0);
 
-    let discountedBase = base;
-    if (discountType === "fixed") {
-      discountedBase -= watchedDiscountAmount || 0;
-    } else if (discountType === "percentage") {
-      discountedBase -= (base * (watchedDiscountAmount || 0)) / 100;
-    }
+  let discountedBase = base;
 
-    let taxAmount = 0;
-    if (purchaseTax !== "none") taxAmount = discountedBase * 0.05; // 5% VAT hardcoded mock
+  if (discountType === "fixed") {
+    discountedBase -= watchedDiscountAmount || 0;
+  } else if (discountType === "percentage") {
+    discountedBase -= (base * (watchedDiscountAmount || 0)) / 100;
+  }
 
-    let extra = (watchedShippingCharges || 0) +
-      additionalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+  let taxAmount = 0;
+  if (purchaseTax !== "none") {
+    taxAmount = discountedBase * 0.05;
+  }
 
-    return Math.max(0, discountedBase + taxAmount + extra);
-  };
+  const shipping = watchedShippingCharges || 0;
+
+  return Math.max(0, discountedBase + taxAmount + shipping);
+};
 
   const purchaseTotal = calculateTotal();
   const paymentDue = Math.max(0, purchaseTotal - (Number(paymentAmount) || 0));
@@ -340,13 +342,15 @@ export function AddPurchase() {
 
   const handleSavePurchase = async (formData: PurchaseFormValues) => {
     if (!formData.supplierId) { toast.error("Please select a supplier"); return; }
-    if (!weight || !price) { toast.error("Weight and Price are required"); return; }
-
+if (!weight || !rate) {
+  toast.error("Weight and Rate are required");
+  return;
+}
     setIsSaving(true);
     try {
       const w = Number(weight) || 0;
-      const p = Number(price) || 0;
-      const totalAmountVal = w * p;
+      const r = Number(rate) || 0;
+const totalAmountVal = w * r;
 
       // Find Hen product — try name match first, then fallback to first product
       const henProduct = products.find(prod => prod.name.toLowerCase().includes('hen'))
@@ -359,40 +363,48 @@ export function AddPurchase() {
         return;
       }
 
-      const itemsToSave = [{
-        productId: henProduct.id,
-        name: henProduct.name,
-        qty: w,
-        unitCost: p,
-        discountPercent: 0,
-        profitMargin: 0,
-        sellingPrice: 0,
-      }];
-
+      const itemsToSave = [
+  {
+    productId: henProduct.id,
+    name: henProduct.name,
+    qty: w,
+    unitCost: r,
+    discountPercent: 0,
+    profitMargin: 0,
+    sellingPrice: 0,
+  },
+];
       const payload = {
-        supplierId: String(formData.supplierId ?? ""),
-        refNo,
-        locationId: locations[0]?.id ? String(locations[0].id) : null,
-        purchaseDate,
-        payTermAmount,
-        payTermType,
-        purchaseStatus,
-        discountType,
-        discountAmount: String(formData.discountAmount ?? 0),
-        purchaseTax,
-        additionalNotes: formData.notes,
-        shippingDetails: `Transport: ${transportName} | Lory No: ${loryNo}`,
-        shippingCharges: String(formData.shippingCharges ?? 0),
-        additionalExpenses,
-        paymentAmount: String(totalAmountVal),
-        paymentMethod: "cash",
-        paymentAccount: "none",
-        paymentNote: "",
-        paymentDate: format(paymentDate, "yyyy-MM-dd"),
-        items: itemsToSave,
-        chequeNo: null,
-        externalAccountNo: null,
-      };
+  supplierId: String(formData.supplierId ?? ""),
+  refNo,
+  locationId: selectedBranchId ? String(selectedBranchId) : locationId || null,
+  purchaseDate,
+  payTermAmount,
+  payTermType,
+  purchaseStatus,
+  discountType,
+  discountAmount: String(formData.discountAmount ?? 0),
+  purchaseTax,
+  additionalNotes: formData.notes,
+
+  shippingDetails,
+  shippingCharges: String(formData.shippingCharges ?? 0),
+
+  paymentAmount: String(totalAmountVal),
+  paymentMethod,
+  paymentAccount,
+  paymentNote,
+  paymentDate: format(paymentDate, "yyyy-MM-dd"),
+
+  rate: String(rate),
+  weight: String(weight),
+  lorryNo,
+  transportName,
+
+  items: itemsToSave,
+  chequeNo: chequeNo || null,
+  externalAccountNo: externalAccountNo || null,
+};
 
       await ApiService.purchases.create(payload);
 
@@ -581,18 +593,17 @@ export function AddPurchase() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Price *</Label>
-                <Input
+<Label>Rate *</Label>                <Input
                   type="number"
                   placeholder="Enter price"
-                  value={price}
-                  onChange={e => setPrice(e.target.value)}
+                  value={rate}
+onChange={e => setRate(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Total Amount</Label>
                 <div className="h-10 px-3 py-2 border rounded-md bg-gray-50 font-semibold text-primary flex items-center">
-                  {formatCurrency((Number(weight) || 0) * (Number(price) || 0))}
+                  {formatCurrency((Number(weight) || 0) * (Number(rate) || 0))}
                 </div>
               </div>
             </div>
@@ -614,11 +625,11 @@ export function AddPurchase() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Lory No</Label>
+                <Label>Lorry No</Label>
                 <Input
                   placeholder="Enter lory no"
-                  value={loryNo}
-                  onChange={e => setLoryNo(e.target.value)}
+                  value={lorryNo}
+                  onChange={e => setLorryNo(e.target.value)}
                 />
               </div>
             </div>

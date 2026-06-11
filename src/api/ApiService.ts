@@ -70,6 +70,7 @@ export const ApiService = {
     update: (id: number, data: any) => apiClient.put(`/customers/${id}`, data).then(res => res.data),
     delete: (id: number) => apiClient.delete(`/customers/${id}`).then(res => res.data),
     getHistory: (id: number, params?: any) => apiClient.get(`/customers/${id}/history`, { params }).then(res => res.data), 
+    addPayment: (id: number, data: any) => apiClient.post(`/customers/${id}/payment`, data).then(res => res.data),
   },
 
 

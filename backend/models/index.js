@@ -261,6 +261,15 @@ Purchase.hasMany(PurchaseItem, { foreignKey: "purchaseId" });
 PurchaseItem.belongsTo(Purchase, { foreignKey: "purchaseId" });
 Product.hasMany(PurchaseItem, { foreignKey: "productId" });
 PurchaseItem.belongsTo(Product, { foreignKey: "productId" });
+User.hasMany(Purchase, {
+  foreignKey: "addedById",
+  as: "AddedPurchases",
+});
+
+Purchase.belongsTo(User, {
+  foreignKey: "addedById",
+  as: "AddedBy",
+});
 
 // Purchase Returns associations
 Organization.hasMany(PurchaseReturn, { foreignKey: "organizationId" });

@@ -152,6 +152,27 @@ const Sale = sequelize.define(
       type: DataTypes.STRING(100),
       allowNull: true,
     },
+    weight: {
+  type: DataTypes.DECIMAL(12, 3),
+  allowNull: false,
+  defaultValue: 0,
+},
+
+rate: {
+  type: DataTypes.DECIMAL(12, 2),
+  allowNull: false,
+  defaultValue: 0,
+},
+
+driverName: {
+  type: DataTypes.STRING(150),
+  allowNull: true,
+},
+
+lorryNo: {
+  type: DataTypes.STRING(100),
+  allowNull: true,
+},
   },
   {
     tableName: "sales",

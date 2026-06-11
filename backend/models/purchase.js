@@ -88,6 +88,34 @@ const Purchase = sequelize.define(
       allowNull: false,
       defaultValue: "due",
     },
+    rate: {
+  type: DataTypes.DECIMAL(12, 2),
+  allowNull: false,
+  defaultValue: 0,
+},
+
+weight: {
+  type: DataTypes.DECIMAL(12, 3),
+  allowNull: false,
+  defaultValue: 0,
+},
+
+lorryNo: {
+  type: DataTypes.STRING(100),
+  allowNull: true,
+},
+
+transportName: {
+  type: DataTypes.STRING(150),
+  allowNull: true,
+},
+
+addedById: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+  references: { model: "users", key: "id" },
+  onDelete: "SET NULL",
+},
   },
   {
     tableName: "purchases",

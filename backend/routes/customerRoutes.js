@@ -11,7 +11,7 @@ const {
   getCustomerReport,
   getCustomerLastServices,
   getCustomerHistory,
-
+  addCustomerPayment,
 } = require("../controllers/customerController");
 
 router.use(protectStaffOrOrganization);
@@ -24,5 +24,6 @@ router.get("/:id", getCustomerById);
 router.put("/:id", customer.update, updateCustomer);
 router.delete("/:id", deleteCustomer);
 router.get("/:id/history", getCustomerHistory);
+router.post("/:id/payment", addCustomerPayment);
 
 module.exports = router;

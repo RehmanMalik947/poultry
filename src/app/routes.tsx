@@ -40,6 +40,8 @@ import { Units } from "./modules/products/Units";
 import { Brands } from "./modules/products/Brands";
 import { AddSale } from "./modules/Sales/AddSale";
 import { ListAccounts } from "./modules/bank-accounts/ListAccounts";
+import { ReceiveFromCustomers } from "./modules/bank-accounts/ReceiveFromCustomers";
+import { PayToSupplier } from "./modules/bank-accounts/PayToSupplier";
 import ManageStock from "./modules/stock/ManageStock";
 import StockAdjustment from "./modules/stock/StockAdjustment";
 import StockTransfer from "./modules/stock/StockTransfer";
@@ -135,8 +137,9 @@ export const router = createBrowserRouter([
       { path: "purchases", Component: ListPurchases },
       { path: "purchases/add", Component: AddPurchase },
       { path: "purchases/return", Component: ListPurchaseReturns },
-      { path: "accounts", Component: ListAccounts },
-      { path: "stock/manage", Component: ManageStock },
+{ path: "accounts", Component: ListAccounts },
+{ path: "accounts/receive-from-customers", Component: ReceiveFromCustomers },
+{ path: "accounts/pay-to-supplier", Component: PayToSupplier },      { path: "stock/manage", Component: ManageStock },
       { path: "stock/adjustment", Component: StockAdjustment },
       { path: "stock/transfer", Component: StockTransfer },
       { path: "/expense", Component: Expense },

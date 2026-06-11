@@ -1,4 +1,4 @@
-const { Purchase, PurchaseItem, Product, Stock, Bank, BankTransaction, SupplierTransaction, PurchaseReturn, PurchaseReturnItem, PurchaseReturnPayment, sequelize } = require("../models");
+const { Purchase, PurchaseItem, Product, Stock, Bank, BankTransaction, SupplierTransaction, PurchaseReturn, User,PurchaseReturnItem, PurchaseReturnPayment, sequelize } = require("../models");
 const { Op } = require("sequelize");
 const { logActivity } = require("../utils/activityLogger");
 
@@ -55,7 +55,11 @@ async function createPurchase(req, res) {
       paymentDate,
       chequeNo,
       externalAccountNo,
-      items
+      items,
+      rate,
+weight,
+lorryNo,
+transportName,
     } = req.body;
 
     const finalBranchId = locationId ? parseInt(locationId, 10) : null;
@@ -72,7 +76,9 @@ async function createPurchase(req, res) {
     }
 
     // Calculate totals
-    let subtotal = items.reduce((sum, item) => sum + (parseFloat(item.qty) * parseFloat(item.unitCost)), 0);
+    const finalRate = parseFloat(rate) || 0;
+const finalWeight = parseFloat(weight) || 0;
+let subtotal = finalWeight * finalRate;
     let totalDiscount = 0;
     if (discountType === "fixed") totalDiscount = parseFloat(discountAmount) || 0;
     else if (discountType === "percentage") totalDiscount = subtotal * (parseFloat(discountAmount) || 0) / 100;
@@ -107,7 +113,12 @@ async function createPurchase(req, res) {
       totalAmount,
       paidAmount,
       additionalNotes,
-      paymentStatus: finalPaymentStatus
+      paymentStatus: finalPaymentStatus,
+      rate: parseFloat(rate) || 0,
+weight: parseFloat(weight) || 0,
+lorryNo: lorryNo || null,
+transportName: transportName || null,
+addedById: req.staff?.id || req.user?.id || null,
     }, { transaction });
 
     for (const item of items) {
@@ -311,8 +322,16 @@ async function getPurchases(req, res) {
     const { count, rows } = await Purchase.findAndCountAll({
       distinct: true,
       where: whereClause,
-      include: ["PurchaseItems", "Branch", "Supplier"],
-      order: [["createdAt", "DESC"]],
+include: [
+  "PurchaseItems",
+  "Branch",
+  "Supplier",
+  {
+    model: User,
+    as: "AddedBy",
+    attributes: ["id", "name"],
+  },
+],      order: [["createdAt", "DESC"]],
       limit: parseInt(limit),
       offset,
     });
@@ -326,15 +345,38 @@ async function getPurchases(req, res) {
 async function getPurchaseById(req, res) {
   try {
     const organizationId = getOrganizationId(req);
+
     const purchase = await Purchase.findOne({
       where: { id: req.params.id, organizationId },
-      include: ["PurchaseItems", "Branch", "Supplier"]
+      include: [
+        "PurchaseItems",
+        "Branch",
+        "Supplier",
+        {
+          model: User,
+          as: "AddedBy",
+          attributes: ["id", "name"],
+        },
+      ],
     });
-    if (!purchase) return res.status(404).json({ success: false, message: "Purchase not found" });
-    return res.status(200).json({ success: true, data: purchase });
+
+    if (!purchase) {
+      return res.status(404).json({
+        success: false,
+        message: "Purchase not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: purchase,
+    });
   } catch (err) {
     console.error("getPurchaseById error:", err);
-    return res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 }
 
@@ -715,7 +757,7 @@ async function getAllPurchaseReturns(req, res) {
       where: whereClause,
       include: [
         { association: 'Supplier', attributes: ['id', 'name', 'phone'] },
-        { association: 'Purchase', attributes: ['id', 'referenceNo', 'total'] },
+        { association: 'Purchase', attributes: ['id', 'referenceNo', 'totalAmount'] },
         { association: 'ReturnItems' },
       ],
       order: [['createdAt', 'DESC']],

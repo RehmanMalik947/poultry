@@ -132,6 +132,13 @@ type SaleRecord = {
   amountPaid?: number;
   remainingBalance?: number;
   dueDate?: string | null;
+  weight?: number | string;
+rate?: number | string;
+driverName?: string | null;
+lorryNo?: string | null;
+referenceNo?: string | null;
+additionalNotes?: string | null;
+shippingDetails?: string | null;
   // Backend (Sequelize) returns SaleItems; legacy alias kept for compat
   SaleItems?: SaleItem[];
   items?: SaleItem[];
@@ -507,8 +514,7 @@ export function ListSales() {
       render: (sale) => (
         <EntityActions
           onView={() => openSaleView(sale)}
-          onEdit={() => navigate(`/pos?editSaleId=${sale.id}`)}
-          onDelete={() => setDeleteConfirmSale(sale)}
+          onEdit={() => navigate(`/sales/add?editSaleId=${sale.id}`)}          onDelete={() => setDeleteConfirmSale(sale)}
           extraActions={[
             {
               label: 'Print Invoice',
@@ -556,8 +562,97 @@ export function ListSales() {
         </div>
       ) : <span className="font-medium">Walk-in Customer</span>
     },
+    
+    // {
+    //   header: "Stylist",
+    //   render: (sale) => sale.Staff ? (
+    //     <div>
+    //       <p className="font-medium text-gray-900">{sale.Staff.firstName} {sale.Staff.lastName}</p>
+    //       {sale.Staff.phone && <p className="text-xs text-gray-500">{sale.Staff.phone}</p>}
+    //     </div>
+    //   ) : (
+    //     <span className="text-gray-400">—</span>
+    //   )
+    // },
+    // { header: 'Items', accessor: 'totalItems', align: 'center' },
+    // { header: 'Subtotal', render: (s) => formatCurrency(s.subtotal ?? 0) },
+    // { header: 'Tax', render: (s) => formatCurrency(s.taxAmount ?? 0), align: 'right' },
+    // { header: 'Discount', render: (s) => formatCurrency(s.discountAmount ?? 0), align: 'right' },
+    // { header: 'Paid', render: (s) => formatCurrency(s.amountPaid ?? 0), className: 'text-green-600 font-medium' },
+    // {
+    //   header: 'Status',
+    //   align: 'center',
+    //   render: (sale) => (
+    //     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${!sale.status || sale.status === "paid" ? "bg-green-100 text-green-700" : sale.status === "partial" ? "bg-amber-100 text-amber-700" : sale.status === "draft" ? "bg-gray-100 text-gray-600" : "bg-red-100 text-red-700"}`}>
+    //       {(sale.status || "COMPLETED").toUpperCase()}
+    //     </span>
+    //   )
+    // },
+    // { header: 'Payment Method', accessor: 'paymentMethod', className: 'text-green-600 font-medium', align: 'center' },
+    // // Add this column after 'Paid' column
+    // {
+    //   header: 'Due Amount',
+    //   align: 'right',
+    //   render: (sale) => {
+    //     const dueAmount = (sale.remainingBalance ??
+    //       Math.max(0, (sale.total || 0) - (sale.amountPaid || 0)));
+    //     return dueAmount > 0 ? (
+    //       <span className="text-red-600 font-semibold">
+    //         {formatCurrency(dueAmount)}
+    //       </span>
+    //     ) : (
+    //       <span className="text-green-600"></span>
+    //     );
+    //   }
+    // },
+    // {
+    //   header: 'Due Date',
+    //   align: 'center',
+    //   render: (sale) => {
+    //     if (!sale.dueDate) return <span className="text-gray-400">—</span>;
+
+    //     const dueDate = new Date(sale.dueDate);
+    //     const today = new Date();
+    //     today.setHours(0, 0, 0, 0);
+
+    //     const isOverdue = dueDate < today && (sale.remainingBalance ??
+    //       Math.max(0, sale.total - (sale.amountPaid || 0))) > 0;
+
+    //     return (
+    //       <span className={`text-sm ${isOverdue ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
+    //         {dueDate.toLocaleDateString()}
+    //         {isOverdue && <span className="ml-1 text-xs">⚠️</span>}
+    //       </span>
+    //     );
+    //   }
+    // },
+        
     {
-      header: "Cashier",
+  header: "Weight",
+  render: (sale: SaleRecord) => (
+    <span className="font-medium">
+      {Number(sale.weight || 0).toLocaleString()} kg
+    </span>
+  ),
+},
+{
+  header: "Rate",
+  render: (sale: SaleRecord) => formatCurrency(Number(sale.rate || 0)),
+},
+{ header: 'Total', render: (s) => formatCurrency(s.total), className: 'font-semibold text-purple-700' },
+
+{
+  header: "Driver Name",
+  render: (sale: SaleRecord) => sale.driverName || "—",
+},
+{
+  header: "Lorry No",
+  render: (sale: SaleRecord) => sale.lorryNo || "—",
+},
+
+    { header: 'Date', render: (s) => formatDate(s.createdAt), className: 'text-gray-600' },
+{
+      header: "Added By",
       render: (sale) => sale.User ? (
         <div>
           <p className="font-medium text-gray-900">{sale.User.name}</p>
@@ -566,72 +661,6 @@ export function ListSales() {
         <span className="text-gray-400">—</span>
       )
     },
-    {
-      header: "Stylist",
-      render: (sale) => sale.Staff ? (
-        <div>
-          <p className="font-medium text-gray-900">{sale.Staff.firstName} {sale.Staff.lastName}</p>
-          {sale.Staff.phone && <p className="text-xs text-gray-500">{sale.Staff.phone}</p>}
-        </div>
-      ) : (
-        <span className="text-gray-400">—</span>
-      )
-    },
-    { header: 'Items', accessor: 'totalItems', align: 'center' },
-    { header: 'Subtotal', render: (s) => formatCurrency(s.subtotal ?? 0) },
-    { header: 'Tax', render: (s) => formatCurrency(s.taxAmount ?? 0), align: 'right' },
-    { header: 'Discount', render: (s) => formatCurrency(s.discountAmount ?? 0), align: 'right' },
-    { header: 'Total', render: (s) => formatCurrency(s.total), className: 'font-semibold text-purple-700' },
-    { header: 'Paid', render: (s) => formatCurrency(s.amountPaid ?? 0), className: 'text-green-600 font-medium' },
-    {
-      header: 'Status',
-      align: 'center',
-      render: (sale) => (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${!sale.status || sale.status === "paid" ? "bg-green-100 text-green-700" : sale.status === "partial" ? "bg-amber-100 text-amber-700" : sale.status === "draft" ? "bg-gray-100 text-gray-600" : "bg-red-100 text-red-700"}`}>
-          {(sale.status || "COMPLETED").toUpperCase()}
-        </span>
-      )
-    },
-    { header: 'Payment Method', accessor: 'paymentMethod', className: 'text-green-600 font-medium', align: 'center' },
-    // Add this column after 'Paid' column
-    {
-      header: 'Due Amount',
-      align: 'right',
-      render: (sale) => {
-        const dueAmount = (sale.remainingBalance ??
-          Math.max(0, (sale.total || 0) - (sale.amountPaid || 0)));
-        return dueAmount > 0 ? (
-          <span className="text-red-600 font-semibold">
-            {formatCurrency(dueAmount)}
-          </span>
-        ) : (
-          <span className="text-green-600"></span>
-        );
-      }
-    },
-    {
-      header: 'Due Date',
-      align: 'center',
-      render: (sale) => {
-        if (!sale.dueDate) return <span className="text-gray-400">—</span>;
-
-        const dueDate = new Date(sale.dueDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const isOverdue = dueDate < today && (sale.remainingBalance ??
-          Math.max(0, sale.total - (sale.amountPaid || 0))) > 0;
-
-        return (
-          <span className={`text-sm ${isOverdue ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
-            {dueDate.toLocaleDateString()}
-            {isOverdue && <span className="ml-1 text-xs">⚠️</span>}
-          </span>
-        );
-      }
-    },
-    { header: 'Date', render: (s) => formatDate(s.createdAt), className: 'text-gray-600' },
-
   ];
 
   const { totalPaid: viewTotalPaid, remaining: viewRemaining, paidPercentage: viewPaidPercentage } = calculateTotals();
@@ -987,12 +1016,7 @@ export function ListSales() {
                         <p className="text-sm font-medium text-muted-foreground">Customer</p>
                         <p className="text-sm text-foreground">{selectedSale.Customer?.name || "Walk-in Customer"}</p>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Cashier</p>
-                        <p className="font-medium">
-                          {selectedSale.User ? selectedSale.User.name : "—"}
-                        </p>
-                      </div>
+                     
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Stylist</p>
                         <p className="font-medium">
@@ -1019,6 +1043,41 @@ export function ListSales() {
                         <p className="text-sm font-medium text-muted-foreground">Total</p>
                         <p className="text-lg font-bold text-purple-700">{formatCurrency(selectedSale.total)}</p>
                       </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div>
+    <p className="text-sm text-gray-500">Weight</p>
+    <p className="font-semibold">
+      {Number(selectedSale.weight || 0).toLocaleString()} kg
+    </p>
+  </div>
+
+  <div>
+    <p className="text-sm text-gray-500">Rate</p>
+    <p className="font-semibold">
+      {formatCurrency(Number(selectedSale.rate || 0))}
+    </p>
+  </div>
+
+  <div>
+    <p className="text-sm text-gray-500">Driver Name</p>
+    <p className="font-semibold">
+      {selectedSale.driverName || "—"}
+    </p>
+  </div>
+
+  <div>
+    <p className="text-sm text-gray-500">Lorry No</p>
+    <p className="font-semibold">
+      {selectedSale.lorryNo || "—"}
+    </p>
+  </div>
+   <div>
+                        <p className="text-sm font-medium text-muted-foreground">Added By</p>
+                        <p className="font-medium">
+                          {selectedSale.User ? selectedSale.User.name : "—"}
+                        </p>
+                      </div>
+</div>
                       {selectedSale.dueDate && (
                         <div className="space-y-1.5">
                           <p className="text-sm font-medium text-muted-foreground">Due Date</p>

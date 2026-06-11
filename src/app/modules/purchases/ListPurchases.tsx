@@ -456,43 +456,73 @@ export function ListPurchases() {
       render: (p) => p.purchaseDate ? format(new Date(p.purchaseDate), "MM/dd/yyyy HH:mm") : "—",
       className: 'text-sm whitespace-nowrap'
     },
-    { header: 'Reference No', accessor: 'referenceNo', className: 'font-medium text-primary hover:underline cursor-pointer' },
+    { header: 'Reciept No', accessor: 'referenceNo', className: 'font-medium text-primary hover:underline cursor-pointer' },
     { header: 'Location', render: (p) => p.Branch?.name || "—", className: 'text-sm text-gray-600' },
     { header: 'Supplier', render: (p) => p.Supplier?.name || "—", className: 'text-sm text-gray-600' },
-    {
-      header: 'Status',
-      render: (p) => getStatusBadge(p.status || 'pending')
-    },
-    {
-      header: 'Payment Status',
-      render: (p) => getPaymentStatusBadge(p.paymentStatus || 'due')
-    },
-    {
+    // {
+    //   header: 'Status',
+    //   render: (p) => getStatusBadge(p.status || 'pending')
+    // },
+    // {
+    //   header: 'Payment Status',
+    //   render: (p) => getPaymentStatusBadge(p.paymentStatus || 'due')
+    // },
+    
+    // {
+    //   header: 'Paid',
+    //   render: (p) => formatCurrency(p.paidAmount || 0),
+    //   className: 'text-green-600 font-medium'
+    // },
+    // {
+    //   header: 'Due Amount',
+    //   align: 'right',
+    //   render: (p) => {
+    //     const dueAmount = parseFloat(p.totalAmount || 0) - parseFloat(p.paidAmount || 0);
+    //     return dueAmount > 0 ? (
+    //       <span className="text-red-600 font-semibold">
+    //         {formatCurrency(dueAmount)}
+    //       </span>
+    //     ) : (
+    //       <span className="text-green-600">—</span>
+    //     );
+    //   }
+    // },
+
+{
+  header: "Weight",
+  render: (p) => (
+    <span className="font-medium">
+      {Number(p.weight || 0).toLocaleString()} kg
+    </span>
+  ),
+},
+{
+  header: "Rate",
+  render: (p) => formatCurrency(p.rate || 0),
+},
+
+{
+  header: "Transport",
+  render: (p) => p.transportName || "—",
+},
+{
+  header: "Lorry No",
+  render: (p) => p.lorryNo || "—",
+},
+{
       header: 'Grand Total',
       render: (p) => formatCurrency(p.totalAmount || 0),
       className: 'font-semibold text-purple-700'
-    },
-    {
-      header: 'Paid',
-      render: (p) => formatCurrency(p.paidAmount || 0),
-      className: 'text-green-600 font-medium'
-    },
-    {
-      header: 'Due Amount',
-      align: 'right',
-      render: (p) => {
-        const dueAmount = parseFloat(p.totalAmount || 0) - parseFloat(p.paidAmount || 0);
-        return dueAmount > 0 ? (
-          <span className="text-red-600 font-semibold">
-            {formatCurrency(dueAmount)}
-          </span>
-        ) : (
-          <span className="text-green-600">—</span>
-        );
-      }
-    },
-    { header: 'Added By', render: () => <span className="text-sm whitespace-nowrap">—</span> }
-  ];
+    }, 
+{
+  header: "Added By",
+  render: (p) => (
+    <span className="text-sm whitespace-nowrap">
+      {p.AddedBy?.name || "—"}
+    </span>
+  ),
+},
+ ];
 
   return (
     <div className="p-3 space-y-3 w-full">
@@ -839,6 +869,40 @@ export function ListPurchases() {
                         <p className="text-sm font-medium text-muted-foreground">Purchase Date</p>
                         <p className="text-sm text-foreground">{formatDateTime(selectedPurchase.purchaseDate)}</p>
                       </div>
+                      <div className="space-y-1.5">
+  <p className="text-sm font-medium text-muted-foreground">Weight</p>
+  <p className="text-sm text-foreground">
+    {Number(selectedPurchase.weight || 0).toLocaleString()} kg
+  </p>
+</div>
+
+<div className="space-y-1.5">
+  <p className="text-sm font-medium text-muted-foreground">Rate</p>
+  <p className="text-sm text-foreground">
+    {formatCurrency(selectedPurchase.rate || 0)}
+  </p>
+</div>
+
+<div className="space-y-1.5">
+  <p className="text-sm font-medium text-muted-foreground">Lorry No</p>
+  <p className="text-sm text-foreground">
+    {selectedPurchase.lorryNo || "—"}
+  </p>
+</div>
+
+<div className="space-y-1.5">
+  <p className="text-sm font-medium text-muted-foreground">Transport Name</p>
+  <p className="text-sm text-foreground">
+    {selectedPurchase.transportName || "—"}
+  </p>
+</div>
+
+<div className="space-y-1.5">
+  <p className="text-sm font-medium text-muted-foreground">Added By</p>
+  <p className="text-sm text-foreground">
+    {selectedPurchase.AddedBy?.name || "—"}
+  </p>
+</div>
                       <div className="space-y-1.5">
                         <p className="text-sm font-medium text-muted-foreground">Created At</p>
                         <p className="text-sm text-foreground">{formatDateTime(selectedPurchase.createdAt)}</p>

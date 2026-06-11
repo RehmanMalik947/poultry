@@ -3,6 +3,7 @@ const { Branch } = require("../models/branch");
 const { Sale } = require("../models/sale");
 const { SaleItem } = require("../models/saleItem");
 const { Op } = require("sequelize");
+const { sequelize } = require("../config/db");
 
 function customerToJson(customer) {
   return {
@@ -285,16 +286,53 @@ async function getAllCustomers(req, res) {
     const limit = Math.min(5000, Math.max(1, parseInt(limitParam, 10) || 10));
     const offset = (page - 1) * limit;
 
-    const { count, rows: customers } = await Customer.findAndCountAll({
+    const { count, rows: customersList } = await Customer.findAndCountAll({
       where,
       order: [["createdAt", "DESC"]],
       limit,
       offset,
     });
 
+    const customerIds = customersList.map((c) => c.id);
+
+    let saleMap = {};
+    if (customerIds.length > 0) {
+      const sales = await Sale.findAll({
+        where: {
+          customerId: customerIds,
+          organizationId,
+        },
+        attributes: [
+          "customerId",
+          [sequelize.fn("SUM", sequelize.col("total")), "totalSales"],
+          [sequelize.fn("SUM", sequelize.col("amount_paid")), "totalPaid"],
+        ],
+        group: ["customerId"],
+      });
+
+      sales.forEach((s) => {
+        saleMap[s.customerId] = {
+          totalSales: parseFloat(s.getDataValue("totalSales") || 0),
+          totalPaid: parseFloat(s.getDataValue("totalPaid") || 0),
+        };
+      });
+    }
+
+    const enrichedCustomers = customersList.map((c) => {
+      const sMap = saleMap[c.id] || { totalSales: 0, totalPaid: 0 };
+      const opening = parseFloat(c.openingBalance) || 0;
+      
+      const balanceDue = opening + sMap.totalSales - sMap.totalPaid;
+      
+      return {
+        ...customerToJson(c),
+        balanceDue,
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      data: customers.map(customerToJson),
+      data: enrichedCustomers,
       total: count,
       page,
       limit,
@@ -344,9 +382,29 @@ async function getCustomerById(req, res) {
       });
     }
 
+    const sales = await Sale.findAll({
+      where: {
+        customerId: customer.id,
+        organizationId,
+      },
+      attributes: [
+        [sequelize.fn("SUM", sequelize.col("total")), "totalSales"],
+        [sequelize.fn("SUM", sequelize.col("amount_paid")), "totalPaid"],
+      ],
+    });
+
+    const totalSales = parseFloat(sales[0]?.getDataValue("totalSales") || 0);
+    const totalPaid = parseFloat(sales[0]?.getDataValue("totalPaid") || 0);
+    const openingBalance = parseFloat(customer.openingBalance) || 0;
+    
+    const balanceDue = openingBalance + totalSales - totalPaid;
+
     return res.status(200).json({
       success: true,
-      data: customerToJson(customer),
+      data: {
+        ...customerToJson(customer),
+        balanceDue,
+      },
     });
   } catch (err) {
     if (err.statusCode === 403) {
@@ -947,6 +1005,185 @@ async function getCustomerHistory(req, res) {
   }
 }
 
+async function generateCustomerPaymentReference(organizationId, transaction) {
+  const { Payment, Sale } = require("../models");
+  const { Op } = require("sequelize");
+  const year = new Date().getFullYear();
+  const prefix = `CP${year}-`;
+  
+  const lastPayment = await Payment.findOne({
+    where: { transactionId: { [Op.like]: `${prefix}%` } },
+    include: [{
+      model: Sale,
+      as: "Sale",
+      where: { organizationId },
+      attributes: []
+    }],
+    order: [["id", "DESC"]],
+    transaction
+  });
+
+  let refNo = `${prefix}0001`;
+  if (lastPayment && lastPayment.transactionId) {
+    const parts = lastPayment.transactionId.split('-');
+    if (parts.length === 2 && !isNaN(parseInt(parts[1], 10))) {
+      refNo = `${prefix}${String(parseInt(parts[1], 10) + 1).padStart(4, '0')}`;
+    }
+  }
+  return refNo;
+}
+
+async function addCustomerPayment(req, res) {
+  const transaction = await sequelize.transaction();
+  try {
+    const organizationId = getOrganizationId(req);
+    const { id } = req.params;
+    const customerId = parseInt(id, 10);
+    let {
+      cashPayment,
+      bankPayment,
+      totalReceived,
+      bankId,
+      referenceNumber,
+      note,
+      date,
+    } = req.body;
+
+    const { Bank, BankTransaction, Payment, Sale } = require("../models");
+    const { Op } = require("sequelize");
+
+    if (!referenceNumber || (typeof referenceNumber === 'string' && referenceNumber.trim() === "")) {
+      referenceNumber = await generateCustomerPaymentReference(organizationId, transaction);
+    }
+
+    const customer = await Customer.findOne({
+      where: { id: customerId, organizationId },
+      transaction,
+    });
+
+    if (!customer) {
+      await transaction.rollback();
+      return res.status(404).json({ success: false, message: "Customer not found" });
+    }
+
+    const cPayment = parseFloat(cashPayment) || 0;
+    const bPayment = parseFloat(bankPayment) || 0;
+    let paymentAmount = cPayment + bPayment;
+
+    if (paymentAmount <= 0 && parseFloat(totalReceived) > 0) {
+      paymentAmount = parseFloat(totalReceived);
+    }
+
+    if (paymentAmount <= 0) {
+      await transaction.rollback();
+      return res.status(400).json({ success: false, message: "Valid amount is required" });
+    }
+
+    if (bPayment > 0 && bankId) {
+      const bank = await Bank.findOne({
+        where: { id: bankId, organizationId },
+        transaction,
+      });
+
+      if (!bank) {
+        await transaction.rollback();
+        return res.status(400).json({ success: false, message: "Invalid bank account" });
+      }
+
+      await BankTransaction.create(
+        {
+          organizationId,
+          bankId: bank.id,
+          type: "credit",
+          amount: bPayment,
+          transactionType: "customer_payment",
+          referenceId: customer.id,
+          description: `Customer Payment: ${customer.name} (${referenceNumber || "Receive From Customer"})`,
+          transactionDate: date || new Date(),
+        },
+        { transaction }
+      );
+
+      bank.balance = Number(bank.balance) + Number(bPayment);
+      await bank.save({ transaction });
+    }
+
+    // Process due sales
+    const dueSales = await Sale.findAll({
+      where: {
+        customerId,
+        organizationId,
+        paymentStatus: { [Op.ne]: "paid" },
+      },
+      order: [["createdAt", "ASC"], ["id", "ASC"]],
+      transaction,
+    });
+
+    let remainingPayment = paymentAmount;
+
+    for (const sale of dueSales) {
+      if (remainingPayment <= 0) break;
+
+      const saleTotal = parseFloat(sale.total) || 0;
+      const previouslyPaid = parseFloat(sale.amountPaid) || 0;
+      const saleDue = saleTotal - previouslyPaid;
+
+      const applyAmount = Math.min(remainingPayment, saleDue);
+
+      if (applyAmount > 0) {
+        const newPaidAmount = previouslyPaid + applyAmount;
+        sale.amountPaid = newPaidAmount;
+
+        if (newPaidAmount >= saleTotal) {
+          sale.paymentStatus = "paid";
+          sale.status = "paid";
+        } else {
+          sale.paymentStatus = "partial";
+          sale.status = "partial";
+        }
+        await sale.save({ transaction });
+
+        // Create Payment record
+        let method = "Cash";
+        if (bPayment > 0 && cPayment === 0) method = "Bank Transfer";
+        else if (cPayment > 0 && bPayment > 0) method = "Multiple";
+
+        await Payment.create({
+          saleId: sale.id,
+          amount: applyAmount,
+          paymentMethod: method,
+          bankId: bPayment > 0 ? bankId : null,
+          transactionId: referenceNumber || null,
+          note: note || `Customer Bulk Payment (${referenceNumber || 'Receive From Customer'})`,
+        }, { transaction });
+
+        remainingPayment -= applyAmount;
+      }
+    }
+
+    // Step 2: If payment still remains after clearing all due sales,
+    // deduct from the customer's opening balance (pre-existing debt)
+    if (remainingPayment > 0) {
+      const currentOpening = parseFloat(customer.openingBalance) || 0;
+
+      if (currentOpening > 0) {
+        const deductFromOpening = Math.min(remainingPayment, currentOpening);
+        customer.openingBalance = Math.max(0, currentOpening - deductFromOpening);
+        await customer.save({ transaction });
+        remainingPayment -= deductFromOpening;
+      }
+    }
+
+    await transaction.commit();
+    return res.status(200).json({ success: true, message: "Payment recorded successfully" });
+
+  } catch (err) {
+    await transaction.rollback();
+    console.error("addCustomerPayment error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+}
+
 module.exports = {
   createCustomer,
   getAllCustomers,
@@ -956,4 +1193,5 @@ module.exports = {
   getCustomerReport,
   getCustomerLastServices,
   getCustomerHistory,
+  addCustomerPayment,
 };

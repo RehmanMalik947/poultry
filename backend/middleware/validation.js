@@ -242,7 +242,7 @@ const sale = {
     body("items.*.itemType").optional().isIn(["product", "service", "package"]).withMessage("Item type must be product, service, or package"),
     body("items.*.quantity").optional().isInt({ min: 1 }).withMessage("Quantity must be at least 1"),
     body("items.*.price").optional().isFloat({ min: 0 }).withMessage("Price must be positive"),
-    body("status").optional().isIn(["paid", "credit", "partial", "draft"]).withMessage("Invalid sale status"),
+    body("status").optional().isIn(["paid", "unpaid", "credit", "partial", "draft"]).withMessage("Invalid sale status"),
     body("paymentMethod").optional().trim(),
     body("amountPaid").optional({ values: "falsy" }).isFloat({ min: 0 }).withMessage("Amount paid must be positive"),
     body("taxPercent").optional({ values: "falsy" }).isFloat({ min: 0 }).withMessage("Tax percent must be positive"),
@@ -252,7 +252,7 @@ const sale = {
   ],
   update: [
     body("customerId").optional({ values: "falsy" }).isInt().withMessage("Customer ID must be a number"),
-    body("status").optional().isIn(["paid", "credit", "partial", "draft"]).withMessage("Invalid sale status"),
+    body("status").optional().isIn(["paid", "unpaid", "credit", "partial", "draft"]).withMessage("Invalid sale status"),
     handleValidation,
   ],
   addItem: [
