@@ -1,4 +1,4 @@
-const { Sale, SaleReturn, Purchase, PurchaseReturn, Branch, Customer, Supplier, ProductVariation, Product, Category, SaleItem, Brand, Stock, SupplierTransaction, Expense } = require("../models");
+const { Sale, SaleReturn, Purchase, PurchaseReturn, Branch, Customer, Supplier, ProductVariation, Product, Category, SaleItem, Brand, Stock, SupplierTransaction, Expense, Bank, BankTransaction } = require("../models");
 const { Op, Sequelize } = require("sequelize");
 
 function getOrganizationId(req) {
@@ -736,6 +736,8 @@ async function getProductSellReport(req, res) {
     let totalAmount = 0;
     let totalDiscount = 0;
     let totalTax = 0;
+    let totalWeight = 0;
+    const countedSaleIds = new Set();
 
     for (const sale of sales) {
       // --- Prorate sale-level discount & tax across product line items ---
@@ -768,6 +770,12 @@ async function getProductSellReport(req, res) {
           const skuText = String(variation?.sku || '').toLowerCase();
           if (!product.name.toLowerCase().includes(searchTerm) && 
               !skuText.includes(searchTerm)) continue;
+        }
+
+        // Count each sale's weight only once (avoid duplicates for multi-item sales)
+        if (!countedSaleIds.has(sale.id)) {
+          countedSaleIds.add(sale.id);
+          totalWeight += parseFloat(sale.weight) || 0;
         }
 
         const quantity  = parseFloat(item.quantity) || 0;
@@ -805,6 +813,7 @@ async function getProductSellReport(req, res) {
           contactNumber: sale.Customer?.mobile || '-',
           email: sale.Customer?.email || '-',
           invoiceNo: sale.invoiceNumber || `SALE-${sale.id}`,
+          referenceNo: sale.referenceNo || '',
           saleDate: sale.createdAt,
           quantity,
           unitPrice,
@@ -821,6 +830,13 @@ async function getProductSellReport(req, res) {
             : (parseFloat(product.currentStock) || 0),
           purchasePrice,
           profit,                        // amount − (purchasePrice × qty)
+          saleId: sale.id,
+          weight: parseFloat(sale.weight) || 0,
+          rate: parseFloat(sale.rate) || 0,
+          saleTotal: parseFloat(sale.total) || 0,
+          driverName: sale.driverName || '',
+          lorryNo: sale.lorryNo || '',
+          note: sale.additionalNotes || '',
         };
 
         reportItems.push(reportItem);
@@ -888,7 +904,8 @@ async function getProductSellReport(req, res) {
         totalQuantity: round2(totalQuantity),
         totalAmount: round2(totalAmount),
         totalDiscount: round2(totalDiscount),
-        totalTax: round2(totalTax)
+        totalTax: round2(totalTax),
+        totalWeight: round2(totalWeight)
       },
       categorySummaries: categorySummaries.map(c => ({
         ...c,
@@ -1581,7 +1598,49 @@ async function getProfitLossReport(req, res) {
     // ─── 8. Breakdown by tab ──────────────────────────────
     let breakdown = [];
 
-    if (tab === 'products' || tab === 'categories' || tab === 'brands') {
+    if (tab === 'daily') {
+      // Fetch all sales with date
+      const allSales = await Sale.findAll({
+        where: { ...base, createdAt: dateFilter },
+        attributes: ['id', 'createdAt', 'total'],
+      });
+      // Fetch all purchases with date
+      const allPurchases = await Purchase.findAll({
+        where: { ...base, createdAt: dateFilter },
+        attributes: ['id', 'purchaseDate', 'createdAt', 'totalAmount'],
+      });
+      // Build date map
+      const dailyMap = {};
+      for (const s of allSales) {
+        const d = s.createdAt ? s.createdAt.toISOString().slice(0, 10) : '';
+        if (!d) continue;
+        if (!dailyMap[d]) dailyMap[d] = { purchase: 0, sale: 0, saleCount: 0, purchaseCount: 0 };
+        dailyMap[d].sale += parseFloat(s.total) || 0;
+        dailyMap[d].saleCount += 1;
+      }
+      for (const p of allPurchases) {
+        const raw = p.purchaseDate || p.createdAt;
+        const d = raw ? new Date(raw).toISOString().slice(0, 10) : '';
+        if (!d) continue;
+        if (!dailyMap[d]) dailyMap[d] = { purchase: 0, sale: 0, saleCount: 0, purchaseCount: 0 };
+        dailyMap[d].purchase += parseFloat(p.totalAmount) || 0;
+        dailyMap[d].purchaseCount += 1;
+      }
+      breakdown = Object.entries(dailyMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, d], idx) => ({
+          id: idx + 1,
+          name: date,
+          date,
+          purchase: round2(d.purchase),
+          sale: round2(d.sale),
+          profit: round2(d.sale - d.purchase),
+          qty: d.saleCount + d.purchaseCount,
+          revenue: round2(d.sale),
+          cost: round2(d.purchase),
+          grossProfit: round2(d.sale - d.purchase),
+        }));
+    } else if (tab === 'products' || tab === 'categories' || tab === 'brands') {
       // Fetch sold items in the date range
       const soldItems = await SaleItem.findAll({
         where: { '$Sale.organization_id$': organizationId, '$Sale.created_at$': dateFilter },
@@ -1848,6 +1907,229 @@ async function getTaxReport(req, res) {
   }
 }
 
+async function getCashSummaryReport(req, res) {
+  try {
+    const organizationId = getOrganizationId(req);
+    const branchId = await getBranchIdFromHeader(req, organizationId);
+    const { from: fromStr, to: toStr } = req.query;
+
+    const dateWhere = {};
+    if (fromStr) {
+      const fromDate = new Date(fromStr);
+      if (!isNaN(fromDate.getTime())) { fromDate.setHours(0, 0, 0, 0); dateWhere[Op.gte] = fromDate; }
+    }
+    if (toStr) {
+      const toDate = new Date(toStr);
+      if (!isNaN(toDate.getTime())) { toDate.setHours(23, 59, 59, 999); dateWhere[Op.lte] = toDate; }
+    }
+
+    const bankWhere = { organizationId, status: 'Active' };
+    if (branchId) bankWhere.branchId = branchId;
+
+    const banks = await Bank.findAll({ where: bankWhere, order: [['bankName', 'ASC']] });
+
+    const data = [];
+    for (const bank of banks) {
+      const currentBalance = parseFloat(bank.balance || 0);
+
+      let received = 0, paid = 0;
+      if (Object.keys(dateWhere).length > 0) {
+        const creditsResult = await BankTransaction.findAll({
+          attributes: [[Sequelize.fn('COALESCE', Sequelize.fn('SUM', Sequelize.col('amount')), 0), 'total']],
+          where: { bankId: bank.id, type: 'credit', transactionDate: dateWhere },
+          raw: true,
+        });
+        const debitsResult = await BankTransaction.findAll({
+          attributes: [[Sequelize.fn('COALESCE', Sequelize.fn('SUM', Sequelize.col('amount')), 0), 'total']],
+          where: { bankId: bank.id, type: 'debit', transactionDate: dateWhere },
+          raw: true,
+        });
+        received = parseFloat(creditsResult[0]?.total || 0);
+        paid = parseFloat(debitsResult[0]?.total || 0);
+      } else {
+        // No date filter — sum all credits/debits ever
+        const creditsResult = await BankTransaction.findAll({
+          attributes: [[Sequelize.fn('COALESCE', Sequelize.fn('SUM', Sequelize.col('amount')), 0), 'total']],
+          where: { bankId: bank.id, type: 'credit' },
+          raw: true,
+        });
+        const debitsResult = await BankTransaction.findAll({
+          attributes: [[Sequelize.fn('COALESCE', Sequelize.fn('SUM', Sequelize.col('amount')), 0), 'total']],
+          where: { bankId: bank.id, type: 'debit' },
+          raw: true,
+        });
+        received = parseFloat(creditsResult[0]?.total || 0);
+        paid = parseFloat(debitsResult[0]?.total || 0);
+      }
+
+      // opening = current balance - net change in the period
+      const opening = currentBalance - (received - paid);
+      const closing = opening + received - paid;
+
+      data.push({
+        id: bank.id,
+        account: bank.bankName,
+        opening: Math.round(opening * 100) / 100,
+        received: Math.round(received * 100) / 100,
+        paid: Math.round(paid * 100) / 100,
+        closing: Math.round(closing * 100) / 100,
+      });
+    }
+
+    return res.status(200).json({ success: true, data });
+  } catch (err) {
+    if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message });
+    console.error('getCashSummaryReport error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+async function getCashInHandReport(req, res) {
+  try {
+    const organizationId = getOrganizationId(req);
+    const branchId = await getBranchIdFromHeader(req, organizationId);
+    const { from: fromStr, to: toStr, page: pageParam, limit: limitParam, search } = req.query;
+    const page = Math.max(1, parseInt(pageParam, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam, 10) || 25));
+
+    const dateWhere = {};
+    if (fromStr) {
+      const fromDate = new Date(fromStr);
+      if (!isNaN(fromDate.getTime())) {
+        fromDate.setHours(0, 0, 0, 0);
+        dateWhere[Op.gte] = fromDate;
+      }
+    }
+    if (toStr) {
+      const toDate = new Date(toStr);
+      if (!isNaN(toDate.getTime())) {
+        toDate.setHours(23, 59, 59, 999);
+        dateWhere[Op.lte] = toDate;
+      }
+    }
+
+    const saleWhere = { organizationId };
+    const supTxnWhere = { organizationId };
+    const expenseWhere = { organizationId };
+    if (Object.keys(dateWhere).length > 0) {
+      saleWhere.createdAt = dateWhere;
+      supTxnWhere.date = dateWhere;
+      expenseWhere.date = dateWhere;
+    }
+    if (branchId != null) {
+      saleWhere.branchId = branchId;
+      expenseWhere.branchId = branchId;
+      supTxnWhere['$Purchase.branchId$'] = branchId;
+    }
+
+    // 1) Sales → Receive
+    const sales = await Sale.findAll({
+      where: saleWhere,
+      include: [{ model: Customer, as: 'Customer', attributes: ['id', 'name'] }],
+      attributes: ['id', 'createdAt', 'invoiceNumber', 'total', 'amountPaid', 'additionalNotes'],
+    });
+
+    // 2) SupplierTransactions → Payment
+    const supTxns = await SupplierTransaction.findAll({
+      where: { ...supTxnWhere, type: { [Op.in]: ['purchase_payment', 'advance_payment'] }, credit: { [Op.gt]: 0 } },
+      include: [
+        { model: Supplier, attributes: ['id', 'name'] },
+        { model: Purchase, as: 'Purchase', attributes: ['id', 'referenceNo'] },
+      ],
+    });
+
+    // 3) Expenses → Expense
+    const expenses = await Expense.findAll({
+      where: expenseWhere,
+      attributes: ['id', 'date', 'referenceNo', 'amount', 'description', 'expenseFor'],
+    });
+
+    const rows = [];
+
+    for (const s of sales) {
+      const amt = parseFloat(s.amountPaid || s.total || 0);
+      if (amt <= 0) continue;
+      rows.push({
+        id: `S-${s.id}`,
+        date: s.createdAt,
+        type: 'Receive',
+        receipt: s.invoiceNumber || '-',
+        received: amt,
+        paid: 0,
+        particular: s.additionalNotes || (s.Customer ? `Sale to ${s.Customer.name}` : 'Sale'),
+      });
+    }
+
+    for (const t of supTxns) {
+      const amt = parseFloat(t.credit || 0);
+      if (amt <= 0) continue;
+      rows.push({
+        id: `P-${t.id}`,
+        date: t.date,
+        type: 'Payment',
+        receipt: t.referenceNo || (t.Purchase ? t.Purchase.referenceNo : '-'),
+        received: 0,
+        paid: amt,
+        particular: t.note || (t.Supplier ? `Payment to ${t.Supplier.name}` : 'Supplier Payment'),
+      });
+    }
+
+    for (const e of expenses) {
+      const amt = parseFloat(e.amount || 0);
+      if (amt <= 0) continue;
+      rows.push({
+        id: `E-${e.id}`,
+        date: e.date,
+        type: 'Expense',
+        receipt: e.referenceNo || '-',
+        received: 0,
+        paid: amt,
+        particular: e.description || e.expenseFor || 'Expense',
+      });
+    }
+
+    // Sort by date ascending to compute running balance
+    rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Compute running balance
+    let balance = 0;
+    for (const r of rows) {
+      balance += r.received - r.paid;
+      r.balance = balance;
+    }
+
+    // Reverse for display (newest first)
+    rows.reverse();
+
+    // Search filter
+    let filtered = rows;
+    if (search) {
+      const term = search.toLowerCase();
+      filtered = rows.filter(r =>
+        r.receipt.toLowerCase().includes(term) ||
+        r.particular.toLowerCase().includes(term) ||
+        r.type.toLowerCase().includes(term)
+      );
+    }
+
+    const total = filtered.length;
+    const paginated = filtered.slice((page - 1) * limit, page * limit);
+
+    return res.status(200).json({
+      success: true,
+      data: paginated,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message });
+    console.error('getCashInHandReport error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
 module.exports = {
   getPurchaseSaleReport,
   getSupplierCustomerReport,
@@ -1861,4 +2143,6 @@ module.exports = {
   getActivityLogReport,
   getProfitLossReport,
   getTaxReport,
+  getCashInHandReport,
+  getCashSummaryReport,
 };

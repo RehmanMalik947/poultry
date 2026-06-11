@@ -15,6 +15,7 @@ router.post("/return/:returnId/payment", purchaseController.addPurchaseReturnPay
 
 // ── Dynamic :id routes ──────────────────────────────────────────────────────
 router.get("/:id", purchaseController.getPurchaseById);
+router.put("/:id", purchaseController.updatePurchase);
 router.delete("/:id", purchaseController.deletePurchase);
 router.post("/:id/payment", purchaseController.addPayment);
 router.get("/:id/payments", purchaseController.getPurchasePayments);

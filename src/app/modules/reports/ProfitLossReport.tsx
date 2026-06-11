@@ -46,7 +46,14 @@ interface BreakdownRow {
   grossProfit: number;
 }
 
+/*const TABS = [
+  { key: 'products',   label: 'Profit by Products',   icon: Package },
+  { key: 'categories', label: 'Profit by Categories', icon: Tag },
+  { key: 'brands',     label: 'Profit by Brands',     icon: Award },
+] as const;*/
+
 const TABS = [
+  { key: 'daily',     label: 'Daily P&L',             icon: TrendingUp },
   { key: 'products',   label: 'Profit by Products',   icon: Package },
   { key: 'categories', label: 'Profit by Categories', icon: Tag },
   { key: 'brands',     label: 'Profit by Brands',     icon: Award },
@@ -70,7 +77,7 @@ export default function ProfitLossReport() {
     const last = new Date(y, m, 0).getDate();
     return `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
   });
-  const [activeTab, setActiveTab] = useState<TabKey>('products');
+  const [activeTab, setActiveTab] = useState<TabKey>('daily');
 
   const [summary, setSummary] = useState<Summary | null>(null);
   const [breakdown, setBreakdown] = useState<BreakdownRow[]>([]);
@@ -164,10 +171,13 @@ export default function ProfitLossReport() {
     revenue: acc.revenue + row.revenue,
     cost: acc.cost + row.cost,
     grossProfit: acc.grossProfit + row.grossProfit,
-  }), { qty: 0, revenue: 0, cost: 0, grossProfit: 0 });
+    purchase: acc.purchase + (row as any).purchase || 0,
+    sale: acc.sale + (row as any).sale || 0,
+    profit: acc.profit + (row as any).profit || 0,
+  }), { qty: 0, revenue: 0, cost: 0, grossProfit: 0, purchase: 0, sale: 0, profit: 0 });
 
   // ─── Render footer row based on active tab ──────────────────────────
-  const renderFooter = () => {
+  /*const renderFooter = () => {
     if (breakdown.length === 0) return undefined;
     
     if (activeTab === 'products') {
@@ -194,70 +204,43 @@ export default function ProfitLossReport() {
         </tr>
       );
     }
-  };
+  };*/
 
   // ─── Breakdown Columns for DataTable ────────────────────────────────
-  const getBreakdownColumns = (): Column<BreakdownRow>[] => {
+  /*const getBreakdownColumns = (): Column<BreakdownRow>[] => {
     if (activeTab === 'products') {
       return [
-        { 
-          header: 'Product',
-          accessor: 'name',
-          className: 'font-medium'
-        },
-        { 
-          header: 'Qty Sold', 
-          render: (row: BreakdownRow) => row.qty?.toString() || '—', 
-          align: 'right' 
-        },
-        { 
-          header: 'Revenue', 
-          render: (row: BreakdownRow) => fmt(row.revenue), 
-          align: 'right' 
-        },
-        { 
-          header: 'Cost', 
-          render: (row: BreakdownRow) => fmt(row.cost), 
-          align: 'right' 
-        },
-        { 
-          header: 'Gross Profit', 
-          render: (row: BreakdownRow) => fmt(row.grossProfit), 
-          align: 'right',
-          className: 'font-semibold'
-        }
+        { header: 'Product', accessor: 'name', className: 'font-medium' },
+        { header: 'Qty Sold', render: (row: BreakdownRow) => row.qty?.toString() || '—', align: 'right' },
+        { header: 'Revenue', render: (row: BreakdownRow) => fmt(row.revenue), align: 'right' },
+        { header: 'Cost', render: (row: BreakdownRow) => fmt(row.cost), align: 'right' },
+        { header: 'Gross Profit', render: (row: BreakdownRow) => fmt(row.grossProfit), align: 'right', className: 'font-semibold' }
       ];
     } else {
       return [
-        { 
-          header: activeTab === 'categories' ? 'Category' : 'Brand',
-          accessor: 'name',
-          className: 'font-medium'
-        },
-        { 
-          header: 'Revenue', 
-          render: (row: BreakdownRow) => fmt(row.revenue), 
-          align: 'right' 
-        },
-        { 
-          header: 'Cost', 
-          render: (row: BreakdownRow) => fmt(row.cost), 
-          align: 'right' 
-        },
-        { 
-          header: 'Gross Profit', 
-          render: (row: BreakdownRow) => fmt(row.grossProfit), 
-          align: 'right',
-          className: 'font-semibold'
-        }
+        { header: activeTab === 'categories' ? 'Category' : 'Brand', accessor: 'name', className: 'font-medium' },
+        { header: 'Revenue', render: (row: BreakdownRow) => fmt(row.revenue), align: 'right' },
+        { header: 'Cost', render: (row: BreakdownRow) => fmt(row.cost), align: 'right' },
+        { header: 'Gross Profit', render: (row: BreakdownRow) => fmt(row.grossProfit), align: 'right', className: 'font-semibold' }
       ];
     }
-  };
+  };*/
 
-  const searched = breakdown.filter((item) =>
+  const dailyColumns: Column<BreakdownRow>[] = [
+    { header: 'Id', accessor: 'id' },
+    { header: 'Date', accessor: 'name' },
+    { header: 'Purchase', render: (row: BreakdownRow) => fmt(row.cost), align: 'right' },
+    { header: 'Sale', render: (row: BreakdownRow) => fmt(row.revenue), align: 'right' },
+    { header: 'Profit / Loss', render: (row: BreakdownRow) => {
+      const val = row.grossProfit;
+      return <span className={val >= 0 ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}>{fmt(val)}</span>;
+    }, align: 'right' },
+  ];
+
+  /*const searched = breakdown.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase())
   );
-  const paginatedData = searched.slice((page - 1) * limit, page * limit);
+  const paginatedData = searched.slice((page - 1) * limit, page * limit);*/
 
   // ─── Render ──────────────────────────────────────────────────────────
   return (
@@ -323,7 +306,7 @@ export default function ProfitLossReport() {
       </div>
 
       {/* Summary Cards */}
-      {/* {summary && (
+      {summary && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="shadow-sm border border-gray-100">
             <CardContent className="p-4 flex flex-col justify-center">
@@ -336,7 +319,6 @@ export default function ProfitLossReport() {
               <p className="text-sm text-gray-500 font-medium">Gross Profit</p>
               <p className={`text-2xl font-bold mt-1 ${summary.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {fmt(summary.grossProfit)}
-                <span className="text-sm font-normal ml-1">({summary.grossProfitPct}%)</span>
               </p>
             </CardContent>
           </Card>
@@ -345,7 +327,6 @@ export default function ProfitLossReport() {
               <p className="text-sm text-gray-500 font-medium">Net Profit</p>
               <p className={`text-2xl font-bold mt-1 ${isNetPositive ? 'text-green-600' : 'text-red-600'}`}>
                 {fmt(summary.netProfit)}
-                <span className="text-sm font-normal ml-1">({summary.netProfitPct}%)</span>
               </p>
             </CardContent>
           </Card>
@@ -356,10 +337,10 @@ export default function ProfitLossReport() {
             </CardContent>
           </Card>
         </div>
-      )} */}
+      )}
 
       {/* Two-Column Cost & Revenue Breakdown */}
-      {summary && (
+      {false && summary && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* COSTS */}
           <Card className="shadow-sm border border-gray-100 overflow-hidden">
@@ -464,7 +445,7 @@ export default function ProfitLossReport() {
       )}
 
       {/* Profit Calculations */}
-      {summary && (
+      {false && summary && (
         <Card className="shadow-sm border border-gray-100">
           <CardContent className="p-4 space-y-3">
             <div>
@@ -501,8 +482,9 @@ export default function ProfitLossReport() {
       )}
 
       {/* Breakdown Tabs with DataTable */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
-        <TabsList className="bg-white border p-1 h-12">
+      <Tabs value="daily">
+        {/* Tab navigation buttons commented */}
+        {/*<TabsList className="bg-white border p-1 h-12">
           {TABS.map(({ key, label, icon: Icon }) => (
             <TabsTrigger 
               key={key} 
@@ -512,9 +494,57 @@ export default function ProfitLossReport() {
               <Icon className="w-4 h-4 mr-2" /> {label}
             </TabsTrigger>
           ))}
-        </TabsList>
+        </TabsList>*/}
 
-        <TabsContent value="products" className="mt-3 focus-visible:outline-none">
+        <TabsContent value="daily" className="mt-3 focus-visible:outline-none">
+          <DataTable
+            title="Daily Profit / Loss"
+            columns={dailyColumns}
+            data={breakdown}
+            loading={loading}
+            emptyMessage="No data found for the selected period"
+            exportable
+            exportFileName="daily-profit-loss"
+            pagination={{
+              total: breakdown.length,
+              page,
+              limit,
+              onPageChange: setPage,
+              onLimitChange: setLimit,
+              itemLabel: "days"
+            }}
+            filters={
+              <div className="flex items-center gap-2">
+                <Select value={String(limit)} onValueChange={(v) => { setLimit(Number(v)); setPage(1); }}>
+                  <SelectTrigger className="w-[80px] h-9 border-gray-300 border-2 rounded-lg hover:bg-gray-50 text-sm [&>svg]:text-gray-300">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="w-[var(--radix-select-trigger-width)] min-w-0">
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            }
+            footer={
+              <div className="px-3 py-2.5 bg-gray-50/80 border-t border-gray-200 flex items-center justify-end gap-6 text-sm">
+                <span className="font-semibold text-gray-700">
+                  Total Purchase: <span className="text-gray-900">{fmt(totals.cost)}</span>
+                </span>
+                <span className="font-semibold text-gray-700">
+                  Total Sale: <span className="text-gray-900">{fmt(totals.revenue)}</span>
+                </span>
+                <span className="font-semibold text-gray-700">
+                  Net Profit / Loss: <span className={totals.grossProfit >= 0 ? 'text-green-600' : 'text-red-500'}>{fmt(totals.grossProfit)}</span>
+                </span>
+              </div>
+            }
+          />
+        </TabsContent>
+
+        {/*<TabsContent value="products" className="mt-3 focus-visible:outline-none">
           <DataTable
             title="Profit by Products"
             icon={Package}
@@ -532,31 +562,6 @@ export default function ProfitLossReport() {
               onLimitChange: setLimit,
               itemLabel: "products"
             }}
-            filters={
-              <div className="flex items-center gap-2">
-                <Select value={String(limit)} onValueChange={(v) => { setLimit(Number(v)); setPage(1); }}>
-                  <SelectTrigger className="w-[80px] h-9 border-gray-300 border-2 rounded-lg hover:bg-gray-50 text-sm [&>svg]:text-gray-300">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="w-[var(--radix-select-trigger-width)] min-w-0">
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search..."
-                    value={search}
-                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                    className="pl-9 border-gray-300 border-2 bg-gray-100 focus-visible:ring-0 focus-visible:border-gray-300"
-                  />
-                </div>
-                
-              </div>
-            }
           />
         </TabsContent>
 
@@ -578,30 +583,6 @@ export default function ProfitLossReport() {
               onLimitChange: setLimit,
               itemLabel: "categories"
             }}
-            filters={
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search..."
-                    value={search}
-                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                    className="pl-9 border-gray-300 border-2 bg-gray-100 focus-visible:ring-0 focus-visible:border-gray-300"
-                  />
-                </div>
-                <Select value={String(limit)} onValueChange={(v) => { setLimit(Number(v)); setPage(1); }}>
-                  <SelectTrigger className="w-[80px] h-9 border-gray-300 border-2 rounded-lg hover:bg-gray-50 text-sm [&>svg]:text-gray-300">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="w-[var(--radix-select-trigger-width)] min-w-0">
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            }
           />
         </TabsContent>
 
@@ -624,74 +605,8 @@ export default function ProfitLossReport() {
               itemLabel: "brands"
             }}
             footer={renderFooter()}
-            filters={
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search..."
-                    value={search}
-                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                    className="pl-9 border-gray-300 border-2 bg-gray-100 focus-visible:ring-0 focus-visible:border-gray-300"
-                  />
-                </div>
-                <Select value={String(limit)} onValueChange={(v) => { setLimit(Number(v)); setPage(1); }}>
-                  <SelectTrigger className="w-[80px] h-9 border-gray-300 border-2 rounded-lg hover:bg-gray-50 text-sm [&>svg]:text-gray-300">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="w-[var(--radix-select-trigger-width)] min-w-0">
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            }
           />
-        </TabsContent>
-
-        <TabsContent value="categories" className="mt-3 focus-visible:outline-none">
-          <DataTable
-            title="Profit by Categories"
-            icon={Tag}
-            columns={getBreakdownColumns()}
-            data={paginatedData}
-            loading={loading}
-            emptyMessage="No profit data found for the selected period"
-            exportable
-            exportFileName="profit-by-categories-2"
-            pagination={{
-              total: searched.length,
-              page,
-              limit,
-              onPageChange: setPage,
-              itemLabel: "categories"
-            }}
-            footer={renderFooter()}
-          />
-        </TabsContent>
-
-        <TabsContent value="brands" className="mt-3 focus-visible:outline-none">
-          <DataTable
-            title="Profit by Brands"
-            icon={Award}
-            columns={getBreakdownColumns()}
-            data={paginatedData}
-            loading={loading}
-            emptyMessage="No profit data found for the selected period"
-            exportable
-            exportFileName="profit-by-brands-2"
-            pagination={{
-              total: searched.length,
-              page,
-              limit,
-              onPageChange: setPage,
-              itemLabel: "brands"
-            }}
-            footer={renderFooter()}
-          />
-        </TabsContent>
+        </TabsContent>*/}
       </Tabs>
     </div>
   );

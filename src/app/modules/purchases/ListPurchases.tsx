@@ -432,7 +432,7 @@ export function ListPurchases() {
       render: (p) => (
         <EntityActions
           onView={() => openPurchaseView(p)}
-          onEdit={() => toast.info('Edit purchase feature is currently under construction.')}
+          onEdit={() => navigate(`/purchases/edit/${p.id}`)}
           onDelete={() => setDeleteConfirmPurchase(p)}
           extraActions={[
             {

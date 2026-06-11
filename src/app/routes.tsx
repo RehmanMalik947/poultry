@@ -62,6 +62,8 @@ import CashRegisterReport from "./modules/reports/CashRegisterReport";
 import ActivityLogReport from "./modules/reports/ActivityLogReport";
 import ProfitLossReport from "./modules/reports/ProfitLossReport";
 import TaxReport from "./modules/reports/TaxReport";
+import CashInHandReport from "./modules/reports/CashInHandReport";
+import CashSummaryReport from "./modules/reports/CashSummaryReport";
 
 function requireAuth() {
   if (typeof window === "undefined") return null;
@@ -123,6 +125,8 @@ export const router = createBrowserRouter([
       { path: "reports/activity-log", Component: ActivityLogReport },
       { path: "reports/profit-loss", Component: ProfitLossReport },
       { path: "reports/tax", Component: TaxReport },
+      { path: "reports/cash-in-hand", Component: CashInHandReport },
+      { path: "reports/cash-summary", Component: CashSummaryReport },
       { path: "whatsapp", Component: WhatsAppCenter },
       { path: "services", Component: Services },
       { path: "settings", Component: Settings },
@@ -136,6 +140,7 @@ export const router = createBrowserRouter([
       { path: "products/brands", Component: Brands },
       { path: "purchases", Component: ListPurchases },
       { path: "purchases/add", Component: AddPurchase },
+      { path: "purchases/edit/:id", Component: AddPurchase },
       { path: "purchases/return", Component: ListPurchaseReturns },
 { path: "accounts", Component: ListAccounts },
 { path: "accounts/receive-from-customers", Component: ReceiveFromCustomers },

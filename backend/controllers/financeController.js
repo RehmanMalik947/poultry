@@ -542,4 +542,71 @@ async function getExpenseCategoryBreakdown(req, res) {
   }
 }
 
-module.exports = { getProfitLoss, getCashFlow, getReceivables, getPayables, getRevenueBreakdown, getCogsBreakdown, getExpenseCategoryBreakdown };
+async function getDashboardSummary(req, res) {
+  try {
+    const organizationId = getOrganizationId(req);
+    const branchId = await getBranchIdFromHeader(req, organizationId);
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const todaySaleQ = { organizationId, createdAt: { [Op.between]: [todayStart, todayEnd] } };
+    const monthSaleQ = { organizationId, createdAt: { [Op.between]: [monthStart, monthEnd] } };
+    const todayPurchaseQ = { organizationId };
+    const monthPurchaseQ = { organizationId };
+    const todayExpenseQ = { organizationId, date: todayStart.toISOString().slice(0, 10) };
+    const monthExpenseQ = { organizationId, date: { [Op.gte]: monthStart.toISOString().slice(0, 10), [Op.lte]: monthEnd.toISOString().slice(0, 10) } };
+
+    todayPurchaseQ[Op.or] = [
+      { purchaseDate: { [Op.between]: [todayStart, todayEnd] } },
+      { createdAt: { [Op.between]: [todayStart, todayEnd] } },
+    ];
+    monthPurchaseQ[Op.or] = [
+      { purchaseDate: { [Op.between]: [monthStart, monthEnd] } },
+      { createdAt: { [Op.between]: [monthStart, monthEnd] } },
+    ];
+
+    if (branchId != null) {
+      todaySaleQ.branchId = branchId;
+      monthSaleQ.branchId = branchId;
+      todayPurchaseQ.branchId = branchId;
+      monthPurchaseQ.branchId = branchId;
+      todayExpenseQ.branchId = branchId;
+      monthExpenseQ.branchId = branchId;
+    }
+
+    const [todaySales, monthSales, todayPurchases, monthPurchases, todayExpenses, monthExpenses] = await Promise.all([
+      Sale.sum('total', { where: todaySaleQ }),
+      Sale.sum('total', { where: monthSaleQ }),
+      Purchase.sum('totalAmount', { where: todayPurchaseQ }),
+      Purchase.sum('totalAmount', { where: monthPurchaseQ }),
+      Expense.sum('amount', { where: todayExpenseQ }),
+      Expense.sum('amount', { where: monthExpenseQ }),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        today: {
+          sales: Math.round(parseFloat(todaySales || 0) * 100) / 100,
+          purchases: Math.round(parseFloat(todayPurchases || 0) * 100) / 100,
+          expenses: Math.round(parseFloat(todayExpenses || 0) * 100) / 100,
+        },
+        month: {
+          sales: Math.round(parseFloat(monthSales || 0) * 100) / 100,
+          purchases: Math.round(parseFloat(monthPurchases || 0) * 100) / 100,
+          expenses: Math.round(parseFloat(monthExpenses || 0) * 100) / 100,
+        },
+      },
+    });
+  } catch (err) {
+    if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message });
+    console.error('getDashboardSummary error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+module.exports = { getProfitLoss, getCashFlow, getReceivables, getPayables, getRevenueBreakdown, getCogsBreakdown, getExpenseCategoryBreakdown, getDashboardSummary };

@@ -99,6 +99,8 @@ const MENU_PATH_PERMISSIONS: Record<string, string[] | null> = {
   '/reports/stock-adjustment': ['report_stock'],
   '/reports/product-purchase': ['report_sales'],
   '/reports/product-sell': ['report_sales'],
+  '/reports/cash-in-hand': ['report_financial'],
+  '/reports/cash-summary': ['report_financial'],
   '/whatsapp': ['whatsapp_history'],
   // '/services': ['pos_view_services'],
   '/settings': [],
@@ -159,17 +161,17 @@ type SubMenuItem = { path: string; label: string; icon: React.ComponentType<{ cl
 type MenuItem = { path: string; label: string; icon: React.ComponentType<{ className?: string }>; children?: SubMenuItem[] };
 const menuItems: MenuItem[] = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/pos', label: 'POS', icon: DollarSign },
-  {
-    path: '/appointments',
-    label: 'Appointments',
-    icon: Calendar,
-    children: [
-      { path: '/appointments', label: 'List Appointments', icon: Circle },
-      { path: '/appointments/add', label: 'Add Appointment', icon: Circle },
-    ],
-  },
-  { path: '/services', label: 'Services', icon: Scissors },
+  // { path: '/pos', label: 'POS', icon: DollarSign },
+  // {
+  //   path: '/appointments',
+  //   label: 'Appointments',
+  //   icon: Calendar,
+  //   children: [
+  //     { path: '/appointments', label: 'List Appointments', icon: Circle },
+  //     { path: '/appointments/add', label: 'Add Appointment', icon: Circle },
+  //   ],
+  // },
+  // { path: '/services', label: 'Services', icon: Scissors },
   {
     path: '/sales',
     label: 'Sales',
@@ -180,22 +182,22 @@ const menuItems: MenuItem[] = [
       { path: '/sales/returns', label: 'Sale Returns', icon: Circle },
     ],
   },
-  {
-    path: '/products',
-    label: 'Products',
-    icon: Box,
-    children: [
-      { path: '/products/add', label: 'Add Product', icon: Circle },
-      { path: '/products', label: 'List Products', icon: Circle },
-      { path: '/products/categories', label: 'Categories', icon: Circle },
-      { path: '/products/variations', label: 'Variations', icon: Circle },
-      { path: '/products/units', label: 'Units', icon: Circle },
-      { path: '/products/brands', label: 'Brands', icon: Circle },
-    ],
+  // {
+  //   path: '/products',
+  //   label: 'Products',
+  //   icon: Box,
+  //   children: [
+  //     { path: '/products/add', label: 'Add Product', icon: Circle },
+  //     { path: '/products', label: 'List Products', icon: Circle },
+  //     { path: '/products/categories', label: 'Categories', icon: Circle },
+  //     { path: '/products/variations', label: 'Variations', icon: Circle },
+  //     { path: '/products/units', label: 'Units', icon: Circle },
+  //     { path: '/products/brands', label: 'Brands', icon: Circle },
+  //   ],
 
 
 
-  },
+  // },
   {
   path: '/accounts',
   label: 'Bank Accounts',
@@ -217,16 +219,16 @@ const menuItems: MenuItem[] = [
     ],
   },
 
-  {
-    path: "/stock/manage",
-    label: "Stock",
-    icon: Package,
-    children: [
-      { path: "/stock/manage", label: "Manage Stock", icon: Circle },
-      { path: "/stock/adjustment", label: "Stock Adjustment", icon: Circle },
-      { path: "/stock/transfer", label: "Stock Transfer", icon: Circle },
-    ],
-  },
+  // {
+  //   path: "/stock/manage",
+  //   label: "Stock",
+  //   icon: Package,
+  //   children: [
+  //     { path: "/stock/manage", label: "Manage Stock", icon: Circle },
+  //     { path: "/stock/adjustment", label: "Stock Adjustment", icon: Circle },
+  //     { path: "/stock/transfer", label: "Stock Transfer", icon: Circle },
+  //   ],
+  // },
 
   {
     path: '/suppliers',
@@ -249,29 +251,33 @@ const menuItems: MenuItem[] = [
   },
   { path: '/customers', label: 'Customers', icon: Users },
   { path: '/staff', label: 'Staff', icon: UserCog },
-  { path: '/payroll', label: 'Payroll', icon: Banknote },
+  // { path: '/payroll', label: 'Payroll', icon: Banknote },
 
 
-  { path: '/finance', label: 'Finance', icon: FileText },
+  // { path: '/finance', label: 'Finance', icon: FileText },
   {
 path: '/reports/profit-loss', 
     label: 'Reports',
     icon: FileText,
     children: [
       { path: '/reports/profit-loss', label: 'Profit / Loss Report', icon: Circle },
-      { path: '/reports/purchase-sale', label: 'Purchase & Sale', icon: Circle },
+      // { path: '/reports/purchase-sale', label: 'Purchase & Sale', icon: Circle },
       // { path: '/reports/tax', label: 'Tax Report', icon: Circle },
-      { path: '/reports/supplier-customer', label: 'Supplier & Customer Report', icon: Circle },
-      { path: '/reports/product-purchase', label: 'Product Purchase Report', icon: Circle },
+    { path: '/reports/product-sell', label: 'Sell Report', icon: Circle },
+
+      { path: '/reports/product-purchase', label: 'Purchase Report', icon: Circle },
+            { path: '/reports/supplier-customer', label: 'Supplier & Customer Report', icon: Circle },
+
       { path: '/reports/purchase-payment', label: 'Purchase Payment Report', icon: Circle },
       { path: '/reports/sell-payment', label: 'Sell Payment Report', icon: Circle },
       { path: '/reports/expense', label: 'Expense Report', icon: Circle },
+      { path: '/reports/cash-in-hand', label: 'Cash in Hand', icon: Circle },
+      { path: '/reports/cash-summary', label: 'Cash Summary', icon: Circle },
       // { path: '/reports/cash-register', label: 'Register Report', icon: Circle },
 
       // { path: '/reports/customer-groups', label: 'Customer Groups Report', icon: Circle },
       // { path: '/reports/stock', label: 'Stock Report', icon: Circle },
       // { path: '/reports/stock-adjustment', label: 'Stock Adjustment Report', icon: Circle },
-      // { path: '/reports/product-sell', label: 'Product Sell Report', icon: Circle },
       // { path: '/reports/activity-log', label: 'Activity Log', icon: Circle }
     ],
   },

@@ -1,6 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Card, CardContent } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { useBranch, getAuthHeadersWithBranch } from '../../contexts/BranchContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
@@ -10,18 +8,26 @@ import {
   Calendar as CalendarIcon,
   ChevronDown,
   Loader2,
-  Building2,
   MapPin,
   Check,
+  Search,
+} from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "../../components/ui/select";
+
+/*import { Card, CardContent } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import {
+  Building2,
   Package,
   TrendingUp,
   TrendingDown,
   Eye,
   History,
-  Search,
   X
 } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
 import {
@@ -31,16 +37,13 @@ import {
   TooltipTrigger,
 } from "../../components/ui/tooltip";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "../../components/ui/select";
-import {
   Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
-} from "../../components/ui/command";
+} from "../../components/ui/command";*/
 
 type ProductSellItem = {
   id: string;
@@ -51,6 +54,7 @@ type ProductSellItem = {
   contactNumber: string;
   email: string;
   invoiceNo: string;
+  referenceNo: string;
   saleDate: string;
   quantity: number;
   unitPrice: number;
@@ -64,9 +68,16 @@ type ProductSellItem = {
   currentStock?: number;
   purchasePrice?: number;
   profit?: number;
+  saleId?: number;
+  weight?: number;
+  rate?: number;
+  saleTotal?: number;
+  driverName?: string;
+  lorryNo?: string;
+  note?: string;
 };
 
-type CategorySummary = {
+/*type CategorySummary = {
   categoryId: number;
   categoryName: string;
   currentStock: number;
@@ -86,7 +97,7 @@ type DateGroupSummary = {
   date: string;
   totalUnitSold: number;
   totalAmount: number;
-};
+};*/
 
 export function ProductSellReport() {
   const { selectedBranchId, branches, setSelectedBranchId, selectedBranch } = useBranch();
@@ -106,16 +117,15 @@ export function ProductSellReport() {
     return `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
   });
 
-  // View states
-  const [activeTab, setActiveTab] = useState<'detailed' | 'detailedWithPurchase' | 'byCategory' | 'byBrand'>('detailed');
   const [items, setItems] = useState<ProductSellItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState('');
   const [totalRecords, setTotalRecords] = useState(0);
+  const [totals, setTotals] = useState({ totalWeight: 0, totalAmount: 0 });
 
-  // Summary data
+  /*const [activeTab, setActiveTab] = useState<'detailed' | 'detailedWithPurchase' | 'byCategory' | 'byBrand'>('detailed');
   const [categorySummaries, setCategorySummaries] = useState<CategorySummary[]>([]);
   const [brandSummaries, setBrandSummaries] = useState<BrandSummary[]>([]);
   const [totalSummary, setTotalSummary] = useState({
@@ -124,18 +134,64 @@ export function ProductSellReport() {
     totalDiscount: 0,
     totalTax: 0
   });
-
-  // Fetch categories and brands for filters
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [brands, setBrands] = useState<{ id: number; name: string }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
-  
-  // Searchable dropdown states
   const [categorySearchOpen, setCategorySearchOpen] = useState(false);
   const [brandSearchOpen, setBrandSearchOpen] = useState(false);
   const [categorySearchTerm, setCategorySearchTerm] = useState('');
-  const [brandSearchTerm, setBrandSearchTerm] = useState('');
+  const [brandSearchTerm, setBrandSearchTerm] = useState('');*/
+
+  const fetchReport = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', page.toString());
+      params.set('limit', limit.toString());
+      params.set('from', fromDate);
+      params.set('to', toDate);
+      params.set('view', 'detailed');
+      if (search) params.set('search', search);
+
+      const res = await fetch(`${API_BASE}/reports/product-sell?${params.toString()}`, {
+        headers: getAuthHeadersWithBranch(selectedBranchId),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setItems(data.data || []);
+        setTotalRecords(data.total || 0);
+        setTotals({
+          totalWeight: data.totalSummary?.totalWeight || 0,
+          totalAmount: data.totalSummary?.totalAmount || 0,
+        });
+        /*setCategorySummaries(data.categorySummaries || []);
+        setBrandSummaries(data.brandSummaries || []);
+        setTotalSummary(data.totalSummary || { totalQuantity: 0, totalAmount: 0, totalDiscount: 0, totalTax: 0 });*/
+      } else {
+        setItems([]);
+        setTotalRecords(0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch product sell report:', err);
+      setItems([]);
+      setTotalRecords(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedBranchId, page, limit, fromDate, toDate, search]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [fromDate, toDate, search]);
+
+  /*useEffect(() => {
+    setPage(1);
+  }, [fromDate, toDate, activeTab, selectedCategory, selectedBrand, search]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -165,54 +221,30 @@ export function ProductSellReport() {
     }
   }, [selectedBranchId]);
 
-  const fetchReport = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', page.toString());
-      params.set('limit', limit.toString());
-      params.set('from', fromDate);
-      params.set('to', toDate);
-      params.set('view', activeTab);
-      if (selectedCategory !== 'all') params.set('categoryId', selectedCategory);
-      if (selectedBrand !== 'all') params.set('brandId', selectedBrand);
-      if (search) params.set('search', search);
-
-      const res = await fetch(`${API_BASE}/reports/product-sell?${params.toString()}`, {
-        headers: getAuthHeadersWithBranch(selectedBranchId),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setItems(data.data || []);
-        setTotalRecords(data.total || 0);
-        setCategorySummaries(data.categorySummaries || []);
-        setBrandSummaries(data.brandSummaries || []);
-        setTotalSummary(data.totalSummary || { totalQuantity: 0, totalAmount: 0, totalDiscount: 0, totalTax: 0 });
-      } else {
-        setItems([]);
-        setTotalRecords(0);
-      }
-    } catch (err) {
-      console.error('Failed to fetch product sell report:', err);
-      setItems([]);
-      setTotalRecords(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedBranchId, page, limit, fromDate, toDate, activeTab, selectedCategory, selectedBrand, search]);
-
-  useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [fromDate, toDate, activeTab, selectedCategory, selectedBrand, search]);
-
   useEffect(() => {
     fetchCategories();
     fetchBrands();
   }, [fetchCategories, fetchBrands]);
+
+  const filteredCategories = categories.filter(cat =>
+    cat.name.toLowerCase().includes(categorySearchTerm.toLowerCase())
+  );
+  
+  const filteredBrands = brands.filter(brand =>
+    brand.name.toLowerCase().includes(brandSearchTerm.toLowerCase())
+  );
+
+  const getSelectedCategoryName = () => {
+    if (selectedCategory === 'all') return 'All Categories';
+    const cat = categories.find(c => c.id.toString() === selectedCategory);
+    return cat?.name || 'All Categories';
+  };
+  
+  const getSelectedBrandName = () => {
+    if (selectedBrand === 'all') return 'All Brands';
+    const brand = brands.find(b => b.id.toString() === selectedBrand);
+    return brand?.name || 'All Brands';
+  };*/
 
   const handleDatePreset = (preset: 'today' | 'yesterday' | '7days' | '30days' | 'thisMonth' | 'lastMonth' | 'allTime') => {
     const today = new Date();
@@ -229,7 +261,7 @@ export function ProductSellReport() {
     } else if (preset === 'today') {
       const dateStr = format(today);
       setFromDate(dateStr);
-      setToDate(dateStr);
+      setToDate(format(today));
     } else if (preset === 'yesterday') {
       const yesterday = new Date(today);
       yesterday.setDate(today.getDate() - 1);
@@ -261,45 +293,21 @@ export function ProductSellReport() {
     setDatePresetOpen(false);
   };
 
-  // Filtered categories and brands based on search
-  const filteredCategories = categories.filter(cat =>
-    cat.name.toLowerCase().includes(categorySearchTerm.toLowerCase())
-  );
-  
-  const filteredBrands = brands.filter(brand =>
-    brand.name.toLowerCase().includes(brandSearchTerm.toLowerCase())
-  );
-
-  // Get selected category/brand names
-  const getSelectedCategoryName = () => {
-    if (selectedCategory === 'all') return 'All Categories';
-    const cat = categories.find(c => c.id.toString() === selectedCategory);
-    return cat?.name || 'All Categories';
-  };
-  
-  const getSelectedBrandName = () => {
-    if (selectedBrand === 'all') return 'All Brands';
-    const brand = brands.find(b => b.id.toString() === selectedBrand);
-    return brand?.name || 'All Brands';
-  };
-
   // Detailed columns
   const detailedColumns: Column<ProductSellItem>[] = [
-    { header: 'Product', accessor: 'productName', className: 'font-medium' },
-    { header: 'SKU', accessor: 'sku' },
-    { header: 'Customer', accessor: 'customerName' },
-    { header: 'Contact', accessor: 'contactNumber' },
-    { header: 'Email', accessor: 'email' },
-    { header: 'Invoice No.', accessor: 'invoiceNo' },
+    { header: 'Id', accessor: 'saleId' },
     { header: 'Date', render: (item) => new Date(item.saleDate).toLocaleDateString() },
-    { header: 'Quantity', render: (item) => `${item.quantity} Pc(s)`, align: 'right' },
-    { header: 'Unit Price', render: (item) => formatCurrency(item.unitPrice), align: 'right' },
-    { header: 'Discount', render: (item) => formatCurrency(item.discount), align: 'right' },
-    { header: 'Tax', render: (item) => formatCurrency(item.tax), align: 'right' },
-    { header: 'Amount', render: (item) => formatCurrency(item.amount), align: 'right', className: 'font-bold' }
+    { header: 'Customer', accessor: 'customerName' },
+    { header: 'Receipt', accessor: 'referenceNo' },
+    { header: 'Weight', render: (item) => `${Number(item.weight || 0).toLocaleString()} kg`, align: 'right' },
+    { header: 'Rate', render: (item) => formatCurrency(Number(item.rate || 0)), align: 'right' },
+    { header: 'Total', render: (item) => formatCurrency(Number(item.saleTotal || 0)), align: 'right', className: 'font-bold' },
+    { header: 'Driver', accessor: 'driverName' },
+    { header: 'Lorry', accessor: 'lorryNo' },
+    { header: 'Note', accessor: 'note' },
   ];
 
-  // Detailed with Purchase columns (includes profit)
+  /*// Detailed with Purchase columns (includes profit)
   const detailedWithPurchaseColumns: Column<ProductSellItem>[] = [
     { header: 'Product', accessor: 'productName', className: 'font-medium' },
     { header: 'SKU', accessor: 'sku' },
@@ -328,10 +336,9 @@ export function ProductSellReport() {
     { header: 'Current Stock', render: (item) => `${item.currentStock} Pc(s)`, align: 'right' },
     { header: 'Total Unit Sold', render: (item) => `${item.totalUnitSold} Pc(s)`, align: 'right' },
     { header: 'Total Amount', render: (item) => formatCurrency(item.totalAmount), align: 'right', className: 'font-bold' }
-  ];
+  ];*/
 
-  // Summary Cards
-  const renderSummaryCards = () => (
+  /*const renderSummaryCards = () => (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       <Card className="shadow-sm border border-gray-100">
         <CardContent className="p-4 flex flex-col justify-center">
@@ -358,17 +365,17 @@ export function ProductSellReport() {
         </CardContent>
       </Card>
     </div>
-  );
+  );*/
 
   return (
-    <TooltipProvider>
-      <div className="p-3 space-y-3 w-full">
+    /*<TooltipProvider>*/
+    <div className="p-3 space-y-3 w-full">
         {/* Page Header with Filters */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-primary">Product Sell Report</h1>
+            <h1 className="text-2xl font-bold text-primary">Sale Report</h1>
             <p className="text-gray-500 text-sm mt-1">
-              Detailed product sales analysis with category and brand summaries
+              Detailed sale records with receipt, weight, rate and transport info
             </p>
           </div>
 
@@ -450,10 +457,9 @@ export function ProductSellReport() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        {renderSummaryCards()}
+        {/*renderSummaryCards()*/}
 
-        {/* Tabs for different views */}
+        {/*{/* Tabs for different views }
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <TabsList className="bg-white border p-1 h-12">
@@ -471,272 +477,172 @@ export function ProductSellReport() {
               </TabsTrigger>
             </TabsList>
 
-            {/* Category/Brand filters based on active tab - Searchable Dropdowns */}
-            {(activeTab === 'detailed' || activeTab === 'detailedWithPurchase') && (
-              <div className="flex items-center gap-2">
-                {/* Searchable Category Dropdown */}
-                <Popover open={categorySearchOpen} onOpenChange={setCategorySearchOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={categorySearchOpen}
-                      className="w-[180px] justify-between"
-                    >
-                      {getSelectedCategoryName()}
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[200px] p-0">
-                    <Command>
-                      <CommandInput 
-                        placeholder="Search category..." 
-                        value={categorySearchTerm}
-                        onValueChange={setCategorySearchTerm}
-                      />
-                      <CommandList>
-                        <CommandEmpty>No category found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            onSelect={() => {
-                              setSelectedCategory('all');
-                              setCategorySearchOpen(false);
-                              setCategorySearchTerm('');
-                            }}
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${selectedCategory === 'all' ? 'opacity-100' : 'opacity-0'}`}
-                            />
-                            All Categories
+            <div className="flex items-center gap-2">
+              <Popover open={categorySearchOpen} onOpenChange={setCategorySearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={categorySearchOpen} className="w-[180px] justify-between">
+                    {getSelectedCategoryName()}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search category..." value={categorySearchTerm} onValueChange={setCategorySearchTerm} />
+                    <CommandList>
+                      <CommandEmpty>No category found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem onSelect={() => { setSelectedCategory('all'); setCategorySearchOpen(false); setCategorySearchTerm(''); }}>
+                          <Check className={`mr-2 h-4 w-4 ${selectedCategory === 'all' ? 'opacity-100' : 'opacity-0'}`} />
+                          All Categories
+                        </CommandItem>
+                        {filteredCategories.map((category) => (
+                          <CommandItem key={category.id} onSelect={() => { setSelectedCategory(category.id.toString()); setCategorySearchOpen(false); setCategorySearchTerm(''); }}>
+                            <Check className={`mr-2 h-4 w-4 ${selectedCategory === category.id.toString() ? 'opacity-100' : 'opacity-0'}`} />
+                            {category.name}
                           </CommandItem>
-                          {filteredCategories.map((category) => (
-                            <CommandItem
-                              key={category.id}
-                              onSelect={() => {
-                                setSelectedCategory(category.id.toString());
-                                setCategorySearchOpen(false);
-                                setCategorySearchTerm('');
-                              }}
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${selectedCategory === category.id.toString() ? 'opacity-100' : 'opacity-0'}`}
-                              />
-                              {category.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
 
-                {/* Searchable Brand Dropdown */}
-                <Popover open={brandSearchOpen} onOpenChange={setBrandSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={brandSearchOpen}
-                      className="w-[160px] justify-between"
-                    >
-                      {getSelectedBrandName()}
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[200px] p-0">
-                    <Command>
-                      <CommandInput 
-                        placeholder="Search brand..." 
-                        value={brandSearchTerm}
-                        onValueChange={setBrandSearchTerm}
-                      />
-                      <CommandList>
-                        <CommandEmpty>No brand found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            onSelect={() => {
-                              setSelectedBrand('all');
-                              setBrandSearchOpen(false);
-                              setBrandSearchTerm('');
-                            }}
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${selectedBrand === 'all' ? 'opacity-100' : 'opacity-0'}`}
-                            />
-                            All Brands
+              <Popover open={brandSearchOpen} onOpenChange={setBrandSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={brandSearchOpen} className="w-[160px] justify-between">
+                    {getSelectedBrandName()}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search brand..." value={brandSearchTerm} onValueChange={setBrandSearchTerm} />
+                    <CommandList>
+                      <CommandEmpty>No brand found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem onSelect={() => { setSelectedBrand('all'); setBrandSearchOpen(false); setBrandSearchTerm(''); }}>
+                          <Check className={`mr-2 h-4 w-4 ${selectedBrand === 'all' ? 'opacity-100' : 'opacity-0'}`} />
+                          All Brands
+                        </CommandItem>
+                        {filteredBrands.map((brand) => (
+                          <CommandItem key={brand.id} onSelect={() => { setSelectedBrand(brand.id.toString()); setBrandSearchOpen(false); setBrandSearchTerm(''); }}>
+                            <Check className={`mr-2 h-4 w-4 ${selectedBrand === brand.id.toString() ? 'opacity-100' : 'opacity-0'}`} />
+                            {brand.name}
                           </CommandItem>
-                          {filteredBrands.map((brand) => (
-                            <CommandItem
-                              key={brand.id}
-                              onSelect={() => {
-                                setSelectedBrand(brand.id.toString());
-                                setBrandSearchOpen(false);
-                                setBrandSearchTerm('');
-                              }}
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${selectedBrand === brand.id.toString() ? 'opacity-100' : 'opacity-0'}`}
-                              />
-                              {brand.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
-          {/* Detailed Tab */}
           <TabsContent value="detailed" className="mt-3 focus-visible:outline-none">
             <DataTable
               title="Product Sales Details"
-              icon={Package}
-              columns={detailedColumns}
-              data={items}
-              loading={loading}
+              columns={detailedColumns} data={items} loading={loading}
               emptyMessage="No sales found for the selected criteria"
-              exportable
-              exportFileName="product-sales-detailed"
-              pagination={{
-                total: totalRecords,
-                page,
-                limit,
-                onPageChange: setPage,
-                onLimitChange: setLimit,
-                itemLabel: "sales records"
-              }}
-              filters={
-                <>
-                <div className="flex items-center gap-2">
-                    <Select value={String(limit)} onValueChange={(v) => { setLimit(Number(v)); setPage(1); }}>
-                      <SelectTrigger className="w-[80px] h-9 border-gray-300 border-2 rounded-lg hover:bg-gray-50 text-sm [&>svg]:text-gray-300">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="w-[var(--radix-select-trigger-width)] min-w-0">
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="100">100</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Search..."
-                      value={search}
-                      onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                      className="pl-9 border-gray-300 border-2 bg-gray-100 focus-visible:ring-0 focus-visible:border-gray-300"
-                    />
-                  </div>
-                  
-                </>
-              }
+              exportable exportFileName="product-sales-detailed"
+              pagination={{ total: totalRecords, page, limit, onPageChange: setPage, onLimitChange: setLimit, itemLabel: "sales records" }}
             />
           </TabsContent>
 
-          {/* Detailed With Purchase Tab */}
           <TabsContent value="detailedWithPurchase" className="mt-3 focus-visible:outline-none">
             <DataTable
               title="Product Sales with Purchase Details"
-              icon={TrendingUp}
-              columns={detailedWithPurchaseColumns}
-              data={items}
-              loading={loading}
+              columns={detailedWithPurchaseColumns} data={items} loading={loading}
               emptyMessage="No sales found for the selected criteria"
-              exportable
-              exportFileName="product-sales-with-purchase"
-              pagination={{
-                total: totalRecords,
-                page,
-                limit,
-                onPageChange: setPage,
-                onLimitChange: setLimit,
-                itemLabel: "sales records"
-              }}
-              filters={
-                <>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Search..."
-                      value={search}
-                      onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                      className="pl-9 border-gray-300 border-2 bg-gray-100 focus-visible:ring-0 focus-visible:border-gray-300"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Select value={String(limit)} onValueChange={(v) => { setLimit(Number(v)); setPage(1); }}>
-                      <SelectTrigger className="w-[80px] h-9 border-gray-300 border-2 rounded-lg hover:bg-gray-50 text-sm [&>svg]:text-gray-300">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="w-[var(--radix-select-trigger-width)] min-w-0">
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="100">100</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              }
+              exportable exportFileName="product-sales-with-purchase"
+              pagination={{ total: totalRecords, page, limit, onPageChange: setPage, onLimitChange: setLimit, itemLabel: "sales records" }}
             />
           </TabsContent>
 
-          {/* By Category Tab */}
           <TabsContent value="byCategory" className="mt-3 focus-visible:outline-none">
             <DataTable
               title="Sales by Category"
-              icon={Package}
-              columns={categoryColumns}
-              data={categorySummaries}
-              loading={loading}
+              columns={categoryColumns} data={categorySummaries} loading={loading}
               emptyMessage="No category data found"
-              exportable
-              exportFileName="sales-by-category"
-              pagination={{
-                total: categorySummaries.length,
-                page: 1,
-                limit: 100,
-                onPageChange: () => {},
-                itemLabel: "categories"
-              }}
+              exportable exportFileName="sales-by-category"
+              pagination={{ total: categorySummaries.length, page: 1, limit: 100, onPageChange: () => {}, itemLabel: "categories" }}
             />
           </TabsContent>
 
-          {/* By Brand Tab */}
           <TabsContent value="byBrand" className="mt-3 focus-visible:outline-none">
             <DataTable
               title="Sales by Brand"
-              icon={Tag}
-              columns={brandColumns}
-              data={brandSummaries}
-              loading={loading}
+              columns={brandColumns} data={brandSummaries} loading={loading}
               emptyMessage="No brand data found"
-              exportable
-              exportFileName="sales-by-brand"
-              pagination={{
-                total: brandSummaries.length,
-                page: 1,
-                limit: 100,
-                onPageChange: () => {},
-                itemLabel: "brands"
-              }}
+              exportable exportFileName="sales-by-brand"
+              pagination={{ total: brandSummaries.length, page: 1, limit: 100, onPageChange: () => {}, itemLabel: "brands" }}
             />
           </TabsContent>
-        </Tabs>
-      </div>
-    </TooltipProvider>
+        </Tabs>*/}
+
+        {/* Sale Report DataTable */}
+        <DataTable
+          title="Sale Records"
+          columns={detailedColumns}
+          data={items}
+          loading={loading}
+          emptyMessage="No sales found for the selected criteria"
+          exportable
+          exportFileName="sale-report"
+          pagination={{
+            total: totalRecords,
+            page,
+            limit,
+            onPageChange: setPage,
+            onLimitChange: setLimit,
+            itemLabel: "sale records"
+          }}
+          filters={
+            <>
+            <div className="flex items-center gap-2">
+                <Select value={String(limit)} onValueChange={(v) => { setLimit(Number(v)); setPage(1); }}>
+                  <SelectTrigger className="w-[80px] h-9 border-gray-300 border-2 rounded-lg hover:bg-gray-50 text-sm [&>svg]:text-gray-300">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="w-[var(--radix-select-trigger-width)] min-w-0">
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search..."
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  className="pl-9 border-gray-300 border-2 bg-gray-100 focus-visible:ring-0 focus-visible:border-gray-300"
+                />
+              </div>
+              
+            </>
+          }
+          footer={
+            <div className="px-3 py-2.5 bg-gray-50/80 border-t border-gray-200 flex items-center justify-end gap-6 text-sm">
+              <span className="font-semibold text-gray-700">
+                Total Weight: <span className="text-gray-900">{Number(totals.totalWeight).toLocaleString()} kg</span>
+              </span>
+              <span className="font-semibold text-gray-700">
+                Total Amount: <span className="text-gray-900">{formatCurrency(totals.totalAmount)}</span>
+              </span>
+            </div>
+          }
+        />
+    </div>
+    /*</TooltipProvider>*/
   );
 }
 
-// Add Tag icon if not already imported
+/*// Add Tag icon if not already imported
 const Tag = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2H2v10l9.17 9.17a2 2 0 0 0 2.83 0l7.17-7.17a2 2 0 0 0 0-2.83L12 2z"/>
     <path d="M7 7h.01"/>
   </svg>
-);
+);*/

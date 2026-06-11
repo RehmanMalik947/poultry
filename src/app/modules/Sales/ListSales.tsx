@@ -537,13 +537,13 @@ export function ListSales() {
       )
     },
     {
-      header: 'Invoice No.',
+      header: 'Receipt',
       align: 'center',
       render: (sale) => {
         const hasReturns = Array.isArray(sale.SaleReturns) && sale.SaleReturns.length > 0;
         return (
           <div className="flex items-center justify-center gap-1.5 font-medium">
-            <span>{sale.invoiceNumber || `#${sale.id}`}</span>
+            <span>{sale.referenceNo || `#${sale.id}`}</span>
             {hasReturns && (
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-purple-100 text-purple-700" title="This sale has returned items">
                 <RotateCcw className="w-3 h-3" />
@@ -912,7 +912,7 @@ export function ListSales() {
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="text-2xl font-bold">
-                          Invoice {selectedSale.invoiceNumber ? `#${selectedSale.invoiceNumber}` : `#${selectedSale.id}`}
+                          Receipt {selectedSale.referenceNo ? `#${selectedSale.referenceNo}` : `#${selectedSale.id}`}
                         </h2>
                         {(() => {
                           const dueAmount = selectedSale.remainingBalance ?? Math.max(0, selectedSale.total - (selectedSale.amountPaid || 0));
@@ -1009,8 +1009,8 @@ export function ListSales() {
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <p className="text-sm font-medium text-muted-foreground">Invoice #</p>
-                        <p className="text-sm text-foreground">  {selectedSale.invoiceNumber || selectedSale.id}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Receipt #</p>
+                        <p className="text-sm text-foreground">  {selectedSale.referenceNo || selectedSale.id}</p>
                       </div>
                       <div className="space-y-1.5">
                         <p className="text-sm font-medium text-muted-foreground">Customer</p>

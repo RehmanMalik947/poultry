@@ -1,6 +1,6 @@
 const express = require("express");
 const { protectStaffOrOrganization } = require("../middleware/authMiddleware");
-const { getProfitLoss, getCashFlow, getReceivables, getPayables, getRevenueBreakdown, getCogsBreakdown, getExpenseCategoryBreakdown } = require("../controllers/financeController");
+const { getProfitLoss, getCashFlow, getReceivables, getPayables, getRevenueBreakdown, getCogsBreakdown, getExpenseCategoryBreakdown, getDashboardSummary } = require("../controllers/financeController");
 
 const router = express.Router();
 
@@ -13,5 +13,6 @@ router.get("/payables", getPayables);
 router.get("/revenue-breakdown", getRevenueBreakdown);
 router.get("/cogs-breakdown", getCogsBreakdown);
 router.get("/expense-category-breakdown", getExpenseCategoryBreakdown);
+router.get("/dashboard-summary", getDashboardSummary);
 
 module.exports = router;

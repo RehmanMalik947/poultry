@@ -381,6 +381,175 @@ async function getPurchaseById(req, res) {
 }
 
 
+async function updatePurchase(req, res) {
+  const transaction = await sequelize.transaction();
+  try {
+    const organizationId = getOrganizationId(req);
+    const purchaseId = req.params.id;
+
+    const purchase = await Purchase.findOne({
+      where: { id: purchaseId, organizationId },
+      include: ["PurchaseItems"],
+      transaction
+    });
+
+    if (!purchase) {
+      await transaction.rollback();
+      return res.status(404).json({ success: false, message: "Purchase not found" });
+    }
+
+    const {
+      supplierId,
+      refNo,
+      locationId,
+      purchaseDate,
+      purchaseStatus,
+      discountType,
+      discountAmount,
+      purchaseTax,
+      additionalNotes,
+      shippingDetails,
+      shippingCharges,
+      items,
+      rate,
+      weight,
+      lorryNo,
+      transportName,
+    } = req.body;
+
+    const finalBranchId = locationId ? parseInt(locationId, 10) : purchase.branchId;
+
+    // Recalculate totals
+    const finalRate = parseFloat(rate) || purchase.rate || 0;
+    const finalWeight = parseFloat(weight) || purchase.weight || 0;
+    let subtotal = finalWeight * finalRate;
+    let totalDiscount = 0;
+    if (discountType === "fixed") totalDiscount = parseFloat(discountAmount) || 0;
+    else if (discountType === "percentage") totalDiscount = subtotal * (parseFloat(discountAmount) || 0) / 100;
+
+    const baseForTax = subtotal - totalDiscount;
+    let taxAmount = 0;
+    if (purchaseTax !== "none") taxAmount = baseForTax * 0.05;
+
+    const shipping = parseFloat(shippingCharges) || 0;
+    const totalAmount = baseForTax + taxAmount + shipping;
+
+    const oldStatus = purchase.status;
+    const oldBranchId = purchase.branchId;
+
+    // Update purchase record
+    await purchase.update({
+      supplierId: supplierId ? parseInt(supplierId, 10) : purchase.supplierId,
+      referenceNo: refNo || purchase.referenceNo,
+      branchId: finalBranchId,
+      purchaseDate: purchaseDate || purchase.purchaseDate,
+      status: purchaseStatus || purchase.status,
+      discountType: discountType || purchase.discountType,
+      discountAmount: totalDiscount,
+      taxAmount,
+      shippingDetails: shippingDetails !== undefined ? shippingDetails : purchase.shippingDetails,
+      shippingCharges: shipping,
+      additionalNotes: additionalNotes !== undefined ? additionalNotes : purchase.additionalNotes,
+      rate: finalRate,
+      weight: finalWeight,
+      lorryNo: lorryNo !== undefined ? lorryNo : purchase.lorryNo,
+      transportName: transportName !== undefined ? transportName : purchase.transportName,
+      totalAmount,
+    }, { transaction });
+
+    // Handle stock reversals if branch changed or status changed
+    if (purchase.PurchaseItems && purchase.PurchaseItems.length > 0) {
+      // Reverse old stock
+      const oldItems = purchase.PurchaseItems;
+      if (oldStatus === "received") {
+        for (const item of oldItems) {
+          const product = await Product.findByPk(item.productId, { transaction });
+          if (product) {
+            product.currentStock = Math.max(0, parseFloat(product.currentStock || 0) - parseFloat(item.quantity));
+            await product.save({ transaction });
+          }
+          if (oldBranchId) {
+            const stock = await Stock.findOne({
+              where: { organizationId, branchId: oldBranchId, productId: item.productId },
+              transaction
+            });
+            if (stock) {
+              stock.qty = Math.max(0, parseFloat(stock.qty) - parseFloat(item.quantity));
+              await stock.save({ transaction });
+            }
+          }
+        }
+      }
+
+      // Delete old purchase items
+      for (const item of oldItems) {
+        await item.destroy({ transaction });
+      }
+    }
+
+    // Re-create purchase items
+    if (items && items.length > 0) {
+      for (const item of items) {
+        await PurchaseItem.create({
+          purchaseId: purchase.id,
+          productId: item.productId,
+          name: item.name,
+          quantity: item.qty,
+          unitCost: item.unitCost,
+          discountPercent: item.discountPercent || 0,
+          profitMargin: item.profitMargin || 0,
+          sellingPrice: item.sellingPrice || 0,
+          lineTotal: item.qty * item.unitCost
+        }, { transaction });
+
+        // Add new stock if status is received
+        const newStatus = purchaseStatus || oldStatus;
+        if (newStatus === "received") {
+          const product = await Product.findByPk(item.productId, { transaction });
+          if (product) {
+            product.currentStock = parseFloat(product.currentStock || 0) + parseFloat(item.qty);
+            await product.save({ transaction });
+          }
+          if (finalBranchId) {
+            let stock = await Stock.findOne({
+              where: { organizationId, branchId: finalBranchId, productId: item.productId },
+              transaction
+            });
+            if (!stock) {
+              stock = await Stock.create({
+                organizationId,
+                branchId: finalBranchId,
+                productId: item.productId,
+                qty: 0,
+                alertQty: 0
+              }, { transaction });
+            }
+            stock.qty = parseFloat(stock.qty) + parseFloat(item.qty);
+            await stock.save({ transaction });
+          }
+        }
+      }
+    }
+
+    await transaction.commit();
+
+    logActivity({
+      organizationId,
+      branchId: finalBranchId || null,
+      userId: req.staff?.id || req.user?.id || null,
+      module: 'Purchases',
+      action: 'Updated',
+      description: `Purchase ${purchase.referenceNo || purchase.id} updated`
+    });
+
+    return res.status(200).json({ success: true, data: purchase });
+  } catch (err) {
+    await transaction.rollback();
+    console.error("updatePurchase error:", err);
+    return res.status(500).json({ success: false, message: err.message || "Server error" });
+  }
+}
+
 async function getPurchasePayments(req, res) {
   try {
     const organizationId = getOrganizationId(req);
@@ -913,6 +1082,7 @@ module.exports = {
   createPurchase,
   getPurchases,
   getPurchaseById,
+  updatePurchase,
   addPayment,
   deletePurchase,
   getPurchasePayments,

@@ -546,9 +546,9 @@ navigate("/sales");
   </div>
 
   <div className="space-y-1">
-    <Label>Reference No</Label>
+    <Label>Receipt No</Label>
     <Input
-      placeholder="Reference No"
+      placeholder="Receipt No"
       value={referenceNo}
       onChange={(e) => setReferenceNo(e.target.value)}
     />

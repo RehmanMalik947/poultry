@@ -127,6 +127,7 @@ export function Dashboard() {
   const [salesTrendPeriod, setSalesTrendPeriod] = useState<'day' | 'week' | 'month'>('week');
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
   const [bookedAppointments, setBookedAppointments] = useState<BookedAppointment[]>([]);
+  const [dashboardSummary, setDashboardSummary] = useState<{ today: { sales: number; purchases: number; expenses: number }; month: { sales: number; purchases: number; expenses: number } } | null>(null);
   type KpiBreakdownId = 'today-sales' | 'total-customers' | 'total-expenses' | 'net-profit';
   const [kpiBreakdown, setKpiBreakdown] = useState<KpiBreakdownId | null>(null);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
@@ -178,7 +179,7 @@ export function Dashboard() {
     const todayStr = now.toISOString().slice(0, 10);
 
     try {
-      const [salesRes, plCurRes, plPrevRes, salesMonthRes, lowStockRes, customersRes, appointmentsRes] = await Promise.all([
+      const [salesRes, plCurRes, plPrevRes, salesMonthRes, lowStockRes, customersRes, appointmentsRes, dashSumRes] = await Promise.all([
         fetch(
           `${POS_API}/sales?todayFrom=${todayStart.toISOString()}&todayTo=${todayEnd.toISOString()}&page=1&limit=1${selectedBranchId != null ? `&branchId=${selectedBranchId}` : ''}`,
           { headers }
@@ -198,6 +199,7 @@ export function Dashboard() {
         fetch(`${INVENTORY_API}/low`, { headers }).then((r) => r.json()),
         fetch(`${CLIENTS_API}?page=1&limit=1`, { headers }).then((r) => r.json()),
         fetch(`${APPOINTMENTS_API}?date=${todayStr}&page=1&limit=100`, { headers }).then((r) => r.json()),
+        fetch(`${FINANCE_API}/dashboard-summary`, { headers }).then((r) => r.json()),
       ]);
 
       if (salesRes?.data?.summary) setPosSummary(salesRes.data.summary);
@@ -220,6 +222,8 @@ export function Dashboard() {
       const apptList = appointmentsRes?.data ?? [];
       const booked = Array.isArray(apptList) ? apptList.filter((a: BookedAppointment) => ['booked', 'arrived', 'completed'].includes(a.status)) : [];
       setBookedAppointments(booked);
+
+      if (dashSumRes?.success) setDashboardSummary(dashSumRes.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load dashboard');
       setPosSummary(null);
@@ -392,11 +396,27 @@ export function Dashboard() {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const periodLabel = `${monthStart.toISOString().slice(0, 10)} – ${monthEnd.toISOString().slice(0, 10)}`;
 
-  const kpiItems: { id: KpiBreakdownId; title: string; value: number; change: number | null; isPositive: boolean; icon: typeof DollarSign; color: string; bgColor: string; isCount?: boolean }[] = [
-    { id: 'today-sales', title: 'Monthly Sales', value: monthRevenue, change: changeRevenue, isPositive: (changeRevenue ?? 0) >= 0, icon: DollarSign, color: 'text-green-600', bgColor: 'bg-green-50' },
-    { id: 'total-customers', title: 'Total Customers', value: customerCount, change: null, isPositive: true, icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-50', isCount: true },
-    { id: 'total-expenses', title: 'Total Expenses', value: totalExpenses, change: changeExpenses, isPositive: (changeExpenses ?? 0) <= 0, icon: CreditCard, color: 'text-orange-600', bgColor: 'bg-orange-50' },
-    { id: 'net-profit', title: 'Net Profit', value: netProfit, change: changeProfit, isPositive: (changeProfit ?? 0) >= 0, icon: Wallet, color: 'text-primary', bgColor: 'bg-secondary' },
+  const todaySalesVal = dashboardSummary?.today?.sales ?? 0;
+  const todayPurchaseVal = dashboardSummary?.today?.purchases ?? 0;
+  const todayExpenseVal = dashboardSummary?.today?.expenses ?? 0;
+  const todayProfitVal = todaySalesVal - todayPurchaseVal - todayExpenseVal;
+  const monthSalesVal = dashboardSummary?.month?.sales ?? monthRevenue;
+  const monthPurchaseVal = dashboardSummary?.month?.purchases ?? 0;
+  const monthExpenseVal = dashboardSummary?.month?.expenses ?? totalExpenses;
+  const monthProfitVal = monthSalesVal - monthPurchaseVal - monthExpenseVal;
+
+  const todayCards = [
+    { title: "Today's Sales", value: todaySalesVal, icon: DollarSign, color: 'text-green-600', bgColor: 'bg-green-50' },
+    { title: "Today's Purchase", value: todayPurchaseVal, icon: CreditCard, color: 'text-orange-600', bgColor: 'bg-orange-50' },
+    { title: "Today's Expense", value: todayExpenseVal, icon: Wallet, color: 'text-red-600', bgColor: 'bg-red-50' },
+    { title: "Today's Profit", value: todayProfitVal, icon: TrendingUp, color: todayProfitVal >= 0 ? 'text-blue-600' : 'text-red-600', bgColor: 'bg-blue-50' },
+  ];
+
+  const monthCards = [
+    { title: "This Month's Sales", value: monthSalesVal, icon: DollarSign, color: 'text-green-600', bgColor: 'bg-green-50' },
+    { title: "This Month's Purchase", value: monthPurchaseVal, icon: CreditCard, color: 'text-orange-600', bgColor: 'bg-orange-50' },
+    { title: "This Month's Expense", value: monthExpenseVal, icon: Wallet, color: 'text-red-600', bgColor: 'bg-red-50' },
+    { title: "This Month's Profit", value: monthProfitVal, icon: TrendingUp, color: monthProfitVal >= 0 ? 'text-blue-600' : 'text-red-600', bgColor: 'bg-blue-50' },
   ];
 
 
@@ -435,43 +455,51 @@ export function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {kpiItems.map((kpi) => {
-          const Icon = kpi.icon;
-          const changeVal = kpi.change;
-          const changeStr = changeVal != null ? formatPercent(changeVal) : '—';
-          return (
-            <Card
-              key={kpi.id}
-              className={`border-0 shadow-sm ${kpi.id !== 'total-customers' ? 'hover:shadow-md transition-shadow cursor-pointer' : ''}`}
-              onClick={() => kpi.id !== 'total-customers' && setKpiBreakdown(kpi.id)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-6">
-                  <div className={`p-3 rounded-xl ${kpi.bgColor}`}>
-                    <Icon className={`w-5 h-5 ${kpi.color}`} />
-                  </div>
-                  {changeVal != null && (
-                    <div
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                        kpi.isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                      }`}
-                    >
-                      {kpi.isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                      {changeStr}
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {todayCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Card key={card.title} className="border-0 shadow-sm">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`p-2.5 rounded-xl ${card.bgColor}`}>
+                      <Icon className={`w-5 h-5 ${card.color}`} />
                     </div>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-gray-600">{kpi.title}</p>
-                  <p className="text-3xl font-bold text-gray-900 tracking-tight">
-                    {kpi.isCount ? kpi.value.toLocaleString() : formatCurrency(kpi.value)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-gray-600">{card.title}</p>
+                    <p className={`text-2xl font-bold tracking-tight ${card.color}`}>
+                      {formatCurrency(card.value)}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {monthCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Card key={card.title} className="border-0 shadow-sm">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`p-2.5 rounded-xl ${card.bgColor}`}>
+                      <Icon className={`w-5 h-5 ${card.color}`} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-gray-600">{card.title}</p>
+                    <p className={`text-2xl font-bold tracking-tight ${card.color}`}>
+                      {formatCurrency(card.value)}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -535,7 +563,7 @@ export function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      {/*<div className="grid grid-cols-1 gap-6">
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold">Top Services</CardTitle>
@@ -570,9 +598,9 @@ export function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </div>*/}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/*<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-white">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
@@ -667,7 +695,7 @@ export function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </div>*/}
 
       {/* KPI breakdown – slides in from the right */}
       <Sheet open={kpiBreakdown != null} onOpenChange={(open) => !open && setKpiBreakdown(null)}>

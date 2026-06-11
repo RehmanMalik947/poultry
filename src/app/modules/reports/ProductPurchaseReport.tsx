@@ -9,7 +9,7 @@ import { DataTable, Column } from "../../components/shared/DataTable";
 import { Input } from "../../components/ui/input";
 import { Calendar as CalendarIcon, ChevronDown, Loader2, MapPin, Check, Package, Search } from "lucide-react";
 
-type PurchaseItem = {
+/*type PurchaseItem = {
   id: number;
   name: string;
   quantity: number | string;
@@ -35,6 +35,19 @@ type FlatPurchaseRecord = {
   quantity: number;
   unitCost: number;
   subtotal: number;
+};*/
+
+type PurchaseRecord = {
+  id: number;
+  referenceNo: string;
+  purchaseDate: string;
+  supplierName: string;
+  weight: number;
+  rate: number;
+  totalAmount: number;
+  lorryNo: string;
+  transportName: string;
+  additionalNotes: string;
 };
 
 export function ProductPurchaseReport() {
@@ -57,90 +70,68 @@ export function ProductPurchaseReport() {
     return `${y}-${String(m).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
   });
 
-  const [allPurchases, setAllPurchases] = useState<PurchaseRow[]>([]);
-  const [rows, setRows] = useState<FlatPurchaseRecord[]>([]);
+  /*const [allPurchases, setAllPurchases] = useState<PurchaseRow[]>([]);
+  const [rows, setRows] = useState<FlatPurchaseRecord[]>([]);*/
+  const [items, setItems] = useState<PurchaseRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState('');
+  const [totals, setTotals] = useState({ totalWeight: 0, totalAmount: 0 });
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
       const res = await ApiService.purchases.getAll({
-        page: 1,
-        limit: 1000,
+        page,
+        limit,
         branchId: selectedBranchId ?? undefined,
+        from: fromDate,
+        to: toDate,
+        search: search || undefined,
       });
       if (res?.success) {
-        setAllPurchases(Array.isArray(res.data) ? res.data : []);
+        const data: any[] = Array.isArray(res.data) ? res.data : [];
+        const mapped: PurchaseRecord[] = data.map((p: any) => ({
+          id: p.id,
+          referenceNo: p.referenceNo || '',
+          purchaseDate: p.purchaseDate ? String(p.purchaseDate).slice(0, 10) : '',
+          supplierName: p.Supplier?.name || '—',
+          weight: Number(p.weight) || 0,
+          rate: Number(p.rate) || 0,
+          totalAmount: Number(p.totalAmount) || 0,
+          lorryNo: p.lorryNo || '',
+          transportName: p.transportName || '',
+          additionalNotes: p.additionalNotes || '',
+        }));
+        setItems(mapped);
+        setTotal(res.total || 0);
+        const tw = mapped.reduce((s, r) => s + r.weight, 0);
+        const ta = mapped.reduce((s, r) => s + r.totalAmount, 0);
+        setTotals({ totalWeight: tw, totalAmount: ta });
       } else {
-        setAllPurchases([]);
-        setRows([]);
+        setItems([]);
         setTotal(0);
+        setTotals({ totalWeight: 0, totalAmount: 0 });
       }
     } catch (error) {
       console.error("Failed to fetch product purchase report:", error);
-      setAllPurchases([]);
-      setRows([]);
+      setItems([]);
       setTotal(0);
+      setTotals({ totalWeight: 0, totalAmount: 0 });
     } finally {
       setLoading(false);
     }
-  }, [selectedBranchId]);
+  }, [selectedBranchId, page, limit, fromDate, toDate, search]);
 
   useEffect(() => {
     fetchReport();
   }, [fetchReport]);
 
   useEffect(() => {
-    const start = new Date(fromDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(toDate);
-    end.setHours(23, 59, 59, 999);
-
-    const filteredPurchases = allPurchases.filter((purchase) => {
-      const rawDate = purchase.purchaseDate || (purchase as any).createdAt;
-      if (!rawDate) return false;
-      const d = new Date(rawDate);
-      if (Number.isNaN(d.getTime())) return false;
-      return d >= start && d <= end;
-    });
-
-    const flattenedData: FlatPurchaseRecord[] = [];
-    filteredPurchases.forEach((purchase: PurchaseRow) => {
-      const items = purchase.PurchaseItems?.length ? purchase.PurchaseItems : [{ id: purchase.id, name: "—", quantity: 0, unitCost: 0 }];
-      items.forEach((item, index) => {
-        const qty = Number(item.quantity) || 0;
-        const unitCost = Number(item.unitCost) || 0;
-        const subtotal = qty * unitCost;
-        flattenedData.push({
-          id: `${purchase.id}-${item.id}-${index}`,
-          productName: item.name || "—",
-          sku: "—",
-          supplierName: purchase.Supplier?.name || "—",
-          referenceNo: purchase.referenceNo || "—",
-          purchaseDate: purchase.purchaseDate ? String(purchase.purchaseDate).slice(0, 10) : "—",
-          quantity: qty,
-          unitCost,
-          subtotal,
-        });
-      });
-    });
-
-    const searchedData = search
-      ? flattenedData.filter((record) =>
-          [record.productName, record.supplierName, record.referenceNo, record.sku].some((field) =>
-            field.toLowerCase().includes(search.toLowerCase())
-          )
-        )
-      : flattenedData;
-
-    setTotal(searchedData.length);
-    const offset = (page - 1) * limit;
-    setRows(searchedData.slice(offset, offset + limit));
-  }, [allPurchases, fromDate, toDate, page, search]);
+    setPage(1);
+  }, [fromDate, toDate, search]);
 
   const handleDatePreset = (preset: "today" | "yesterday" | "7days" | "30days" | "thisMonth" | "lastMonth") => {
     const today = new Date();
@@ -187,40 +178,37 @@ export function ProductPurchaseReport() {
   };
 
   // Define columns for DataTable
-  const columns: Column<FlatPurchaseRecord>[] = [
+  /*const columns: Column<FlatPurchaseRecord>[] = [
     { header: 'Product', accessor: 'productName', className: 'font-medium' },
     { header: 'SKU', accessor: 'sku' },
     { header: 'Supplier', accessor: 'supplierName' },
     { header: 'Reference No', accessor: 'referenceNo' },
     { header: 'Date', accessor: 'purchaseDate' },
-    { 
-      header: 'Quantity', 
-      accessor: 'quantity',
-      render: (record) => `${record.quantity.toFixed(2)} Pc(s)`,
-      align: 'right'
-    },
-    { 
-      header: 'Unit Purchase Price', 
-      accessor: 'unitCost',
-      render: (record) => formatCurrency(record.unitCost),
-      align: 'right'
-    },
-    { 
-      header: 'Subtotal', 
-      accessor: 'subtotal',
-      render: (record) => formatCurrency(record.subtotal),
-      align: 'right',
-      className: 'font-semibold'
-    }
+    { header: 'Quantity', render: (record) => `${record.quantity.toFixed(2)} Pc(s)`, align: 'right' },
+    { header: 'Unit Purchase Price', accessor: 'unitCost', render: (record) => formatCurrency(record.unitCost), align: 'right' },
+    { header: 'Subtotal', accessor: 'subtotal', render: (record) => formatCurrency(record.subtotal), align: 'right', className: 'font-semibold' }
+  ];*/
+
+  const columns: Column<PurchaseRecord>[] = [
+    { header: 'Id', accessor: 'id' },
+    { header: 'Date', accessor: 'purchaseDate' },
+    { header: 'Supplier', accessor: 'supplierName' },
+    { header: 'Receipt', accessor: 'referenceNo' },
+    { header: 'Weight', render: (record) => `${Number(record.weight || 0).toLocaleString()} kg`, align: 'right' },
+    { header: 'Rate', render: (record) => formatCurrency(Number(record.rate || 0)), align: 'right' },
+    { header: 'Total', render: (record) => formatCurrency(Number(record.totalAmount || 0)), align: 'right', className: 'font-bold' },
+    { header: 'Driver', accessor: 'transportName' },
+    { header: 'Lorry', accessor: 'lorryNo' },
+    { header: 'Note', accessor: 'additionalNotes' },
   ];
 
   return (
     <div className="p-3 space-y-3 w-full">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-primary">Product Purchase Report</h1>
+          <h1 className="text-2xl font-bold text-primary">Purchase Report</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Detailed product purchase history with supplier information
+            Detailed purchase records with receipt, weight, rate and transport info
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -301,14 +289,13 @@ export function ProductPurchaseReport() {
 
       {/* Main Report DataTable */}
       <DataTable
-        title="Purchase History"
-        icon={Package}
+        title="Purchase Records"
         columns={columns}
-        data={rows}
+        data={items}
         loading={loading}
         emptyMessage="No purchases found for the selected criteria"
         exportable
-        exportFileName="product-purchases"
+        exportFileName="purchase-report"
         filters={
           <>
           <div className="flex items-center gap-2">
@@ -344,6 +331,16 @@ export function ProductPurchaseReport() {
           onLimitChange: setLimit,
           itemLabel: "purchase records"
         }}
+        footer={
+          <div className="px-3 py-2.5 bg-gray-50/80 border-t border-gray-200 flex items-center justify-end gap-6 text-sm">
+            <span className="font-semibold text-gray-700">
+              Total Weight: <span className="text-gray-900">{Number(totals.totalWeight).toLocaleString()} kg</span>
+            </span>
+            <span className="font-semibold text-gray-700">
+              Total Amount: <span className="text-gray-900">{formatCurrency(totals.totalAmount)}</span>
+            </span>
+          </div>
+        }
       />
     </div>
   );

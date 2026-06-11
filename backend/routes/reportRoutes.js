@@ -1,6 +1,6 @@
 const express = require("express");
 const { protectStaffOrOrganization } = require("../middleware/authMiddleware");
-const { getPurchaseSaleReport, getStockReport, getSupplierCustomerReport, getStockAdjustmentReport, getProductSellReport, getPurchasePaymentReport, getSellPaymentReport, getExpenseReport, getCashRegisterReport, getActivityLogReport, getProfitLossReport, getTaxReport } = require("../controllers/reportController");
+const { getPurchaseSaleReport, getStockReport, getSupplierCustomerReport, getStockAdjustmentReport, getProductSellReport, getPurchasePaymentReport, getSellPaymentReport, getExpenseReport, getCashRegisterReport, getActivityLogReport, getProfitLossReport, getTaxReport, getCashInHandReport, getCashSummaryReport } = require("../controllers/reportController");
 const router = express.Router();
 
 // Apply auth middleware to all report routes
@@ -18,6 +18,8 @@ router.get('/cash-register', getCashRegisterReport);
 router.get('/activity-log', getActivityLogReport);
 router.get('/profit-loss', getProfitLossReport);
 router.get('/tax', getTaxReport);
+router.get('/cash-in-hand', getCashInHandReport);
+router.get('/cash-summary', getCashSummaryReport);
 
 module.exports = router;
 
